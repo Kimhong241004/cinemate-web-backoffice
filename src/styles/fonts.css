@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanuman&family=Open+Sans:wght@400;600;700&display=swap');
+
+body {
+  font-family: 'Open Sans', 'Hanuman', sans-serif;
+}
+
+:lang(km) {
+  font-family: 'Hanuman', serif;
+  line-height: 1.7;
+}
+
+.km {
+  font-family: 'Hanuman', serif;
+  line-height: 1.7;
+}
+
+.en {
+  font-family: 'Open Sans', sans-serif;
+}
