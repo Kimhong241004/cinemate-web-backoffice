@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Save, X, Loader2, Lock, User } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { useProfile } from '../context/ProfileContext';
-import { profileService } from '../../api/services/profileService';
+import { useLanguage } from '../../context/LanguageContext';
+import { useProfile } from '../../context/ProfileContext';
+import { profileService } from '../../../api/services/profileService';
 
 const ProfileSettings = () => {
   const { t } = useLanguage();
@@ -154,7 +154,7 @@ const ProfileSettings = () => {
   );
 
   const inputClass = `w-full bg-[#0a0a0a] border border-[#27272a] text-white px-4 py-2.5 rounded-lg
-    focus:outline-none focus:border-[#f97316] transition-colors placeholder:text-[#52525b] text-sm`;
+    focus:outline-none focus:border-[#FF2E63] transition-colors placeholder:text-[#52525b] text-sm`;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -168,7 +168,7 @@ const ProfileSettings = () => {
           <button
             onClick={handleEdit}
             disabled={profileLoading}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity self-start sm:self-auto disabled:opacity-60"
+            className="px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity self-start sm:self-auto disabled:opacity-60"
           >
             {t.profileSettings.editProfile}
           </button>
@@ -184,7 +184,7 @@ const ProfileSettings = () => {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity flex items-center gap-2 disabled:opacity-60"
+              className="px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity flex items-center gap-2 disabled:opacity-60"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {isSaving ? 'Saving…' : t.profileSettings.saveChanges}
@@ -215,7 +215,7 @@ const ProfileSettings = () => {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingAvatar}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-br from-[#ef4444] to-[#f97316] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-br from-[#6C5CE7] to-[#FF2E63] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               <Camera className="w-4 h-4 text-white" />
             </button>
@@ -285,7 +285,7 @@ const ProfileSettings = () => {
       {/* Change Password */}
       <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-5 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Lock className="w-5 h-5 text-[#f97316]" />
+          <Lock className="w-5 h-5 text-[#FF2E63]" />
           <h2 className="text-white font-bold">{t.profileSettings.changePassword}</h2>
         </div>
 
@@ -325,7 +325,7 @@ const ProfileSettings = () => {
           <button
             onClick={handleChangePassword}
             disabled={isChangingPassword}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] hover:opacity-90 text-white text-sm font-bold rounded-lg transition-opacity flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
             {isChangingPassword ? 'Updating…' : t.profileSettings.updatePassword}

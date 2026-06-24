@@ -2,23 +2,21 @@
 import { createBrowserRouter } from 'react-router';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import Dashboard from './pages/Dashboard';
-import ContentLibrary from './pages/ContentLibrary';
-import UserManagement from './pages/UserManagement';
-import TvChannels from './pages/TvChannels';
-import Radio from './pages/Radio';
-import Creators from './pages/Creators';
-import Movies from './pages/Movies';
-import AddMovie from './pages/AddMovie';
-import Author from './pages/Author';
-import Transactions from './pages/Transactions';
-import PromoCodes from './pages/PromoCodes';
-import Subscriptions from './pages/Subscriptions';
-import UserSystem from './pages/UserSystem';
-import Settings from './pages/Settings';
-import ProfileSettings from './pages/ProfileSettings';
+import Dashboard from './pages/Dashboard/Dashboard';
+import UserManagement from './pages/UserManagment/UserManagement';
+import Movies from './pages/Movies/Movies';
+import AddMovie from './pages/Movies/AddMovie';
+import EditMovie from './pages/Movies/EditMovie';
+import Author from './pages/Author/Author';
+import Transactions from './pages/Transactions/Transactions';
+import PromoCodes from './pages/PromoCodes/PromoCodes';
+import Subscriptions from './pages/Subscriptions/Subscriptions';
+import UserSystem from './pages/UserSystem/UserSystem';
+import Settings from './pages/Settings/Settings';
+import ProfileSettings from './pages/Settings/ProfileSettings';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import Rooms from './pages/Rooms/Rooms';
 
 export const router = createBrowserRouter([
   {
@@ -37,15 +35,20 @@ export const router = createBrowserRouter([
         index: true,
         element: <Dashboard />,
       },
-      {
+
+      // hidden Content Library route
+     /* {
         path: 'content-library',
         element: <ContentLibrary />,
-      },
+      }, */
+      
       {
         path: 'user-management',
         element: <UserManagement />,
       },
-      {
+
+      // hidden Content Management routes
+      /* {
         path: 'tv-channels',
         element: <TvChannels />,
       },
@@ -56,7 +59,8 @@ export const router = createBrowserRouter([
       {
         path: 'creators',
         element: <Creators />,
-      },
+      }, */
+      
       {
         path: 'movies',
         element: <Movies />,
@@ -67,11 +71,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'movies/edit/:id',
-        element: <AddMovie />,
+        element: <EditMovie />,
       },
       {
         path: 'author',
         element: <Author />,
+      },
+      {
+        path: 'rooms',
+        element: <Rooms />,
       },
       {
         path: 'transactions',

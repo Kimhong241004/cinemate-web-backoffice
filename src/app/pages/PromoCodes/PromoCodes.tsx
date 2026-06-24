@@ -6,23 +6,23 @@ import {
   Copy,
   Edit,
   Trash2,
-  X,
 } from "lucide-react";
-import { useNotification } from "../context/NotificationContext";
-import { useLanguage } from "../context/LanguageContext";
-import ConfirmDialog from "../components/shared/ConfirmDialog";
-import Pagination from "../components/shared/Pagination";
+import { useNotification } from "../../context/NotificationContext";
+import { useLanguage } from "../../context/LanguageContext";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import Pagination from "../../components/shared/Pagination";
+import PromoCodeFormModal from "../../components/promocodes/PromoCodeFormModal";
 import {
   promoCodeService,
   type PromoCodeFromApi,
-} from "../../api/services/promoCodeService";
+} from "../../../api/services/promoCodeService";
 
 interface PromoCode {
   globalId: string;
   id: number;
   code: string;
   description: string;
-  promoCodeType: "movie" | "subscription";
+  promoCodeType: string[];
   status: "active" | "inactive" | "expired";
   discountType: "percentage" | "amount";
   discountValue: number;
@@ -46,7 +46,11 @@ const mapFromApi = (item: PromoCodeFromApi): PromoCode => {
     id: item.id,
     code: item.code,
     description: item.description,
-    promoCodeType: item.promo_code_type,
+    promoCodeType: Array.isArray(item.promo_code_type)
+      ? item.promo_code_type.filter(Boolean)
+      : item.promo_code_type
+        ? [item.promo_code_type]
+        : ["subscription"],
     status,
     discountType: item.discount_type,
     discountValue: item.discount_amount,
@@ -76,7 +80,7 @@ const PromoCodes = () => {
   const [formData, setFormData] = useState({
     code: "",
     description: "",
-    promoCodeType: "movie" as "movie" | "subscription",
+    promoCodeType: ["movie"] as string[],
     discountType: "percentage" as "percentage" | "amount",
     discountValue: "",
     usageLimit: "",
@@ -201,7 +205,7 @@ const PromoCodes = () => {
       const payload = {
         code: formData.code,
         description: formData.description,
-        promo_code_type: formData.promoCodeType,
+        promo_code_type: formData.promoCodeType[0] as "movie" | "subscription" | "series" | "season" | "episode",
         discount_type: formData.discountType,
         discount_amount: Number(formData.discountValue),
         usage_limit: Number(formData.usageLimit),
@@ -234,7 +238,7 @@ const PromoCodes = () => {
       setFormData({
         code: promo.code,
         description: promo.description,
-        promoCodeType: promo.promoCodeType,
+        promoCodeType: promo.promoCodeType as string[],
         discountType: promo.discountType,
         discountValue: String(promo.discountValue),
         usageLimit: String(promo.usageLimit),
@@ -246,7 +250,7 @@ const PromoCodes = () => {
       setFormData({
         code: "",
         description: "",
-        promoCodeType: "movie",
+        promoCodeType: ["movie"],
         discountType: "percentage",
         discountValue: "",
         usageLimit: "",
@@ -269,7 +273,7 @@ const PromoCodes = () => {
     setFormData({
       code: "",
       description: "",
-      promoCodeType: "movie",
+      promoCodeType: ["movie"],
       discountType: "percentage",
       discountValue: "",
       usageLimit: "",
@@ -330,7 +334,7 @@ const PromoCodes = () => {
           </div>
           <button
             onClick={() => handleOpenModal()}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             {t.promoCodes.createCode}
@@ -460,7 +464,7 @@ const PromoCodes = () => {
                   {/* Icon */}
                   <div className="w-12 h-12 rounded-xl bg-[#27272a] hidden sm:flex items-center justify-center flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-[#f97316]"
+                      className="w-6 h-6 text-[#6C5CE7]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -497,13 +501,17 @@ const PromoCodes = () => {
                       >
                         {getStatusLabel(promo.status)}
                       </span>
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        promo.promoCodeType === "movie"
-                          ? "bg-[#3b82f6]/20 text-[#3b82f6]"
-                          : "bg-[#f97316]/20 text-[#f97316]"
-                      }`}>
-                        {promo.promoCodeType === "movie" ? "Movie" : "Subscription"}
-                      </span>
+                      {(Array.isArray(promo.promoCodeType) ? promo.promoCodeType : [promo.promoCodeType]).filter(Boolean).map((type) => (
+                        <span key={type} className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          type === "movie" ? "bg-[#3b82f6]/20 text-[#3b82f6]"
+                          : type === "series" ? "bg-[#10b981]/20 text-[#10b981]"
+                          : type === "season" ? "bg-[#f59e0b]/20 text-[#f59e0b]"
+                          : type === "episode" ? "bg-[#ec4899]/20 text-[#ec4899]"
+                          : "bg-[#6C5CE7]/20 text-[#6C5CE7]"
+                        }`}>
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </span>
+                      ))}
                     </div>
 
                     {promo.description && (
@@ -518,7 +526,7 @@ const PromoCodes = () => {
                         <p className="text-[#71717a] text-xs mb-1">
                           {t.promoCodes.discount}
                         </p>
-                        <p className="text-[#ef4444] text-sm font-bold">
+                        <p className="bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] bg-clip-text text-transparent text-sm font-bold">
                           {formatDiscount(
                             promo.discountType,
                             promo.discountValue,
@@ -546,7 +554,7 @@ const PromoCodes = () => {
                     {/* Progress Bar */}
                     <div className="relative w-full h-2 bg-[#27272a] rounded-full overflow-hidden">
                       <div
-                        className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-[#ef4444] to-[#f97316]"
+                        className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63]"
                         style={{
                           width: `${getProgressPercent(promo.usageCount, promo.usageLimit)}%`,
                         }}
@@ -560,7 +568,7 @@ const PromoCodes = () => {
                       onClick={() => handleOpenModal(promo)}
                       className="flex-1 sm:flex-none p-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] transition-colors"
                     >
-                      <Edit className="w-4 h-4 text-[#3b82f6]" />
+                      <Edit className="w-4 h-4 text-[#6C5CE7]" />
                     </button>
                     <button
                       onClick={() => setDeletePromo(promo)}
@@ -584,270 +592,17 @@ const PromoCodes = () => {
         />
       </div>
 
-      {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-[#18181b] rounded-2xl border border-[#27272a] p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-white text-xl font-bold">
-                {editingPromo ? t.promoCodes.editCode : t.promoCodes.createCode}
-              </h2>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-              >
-                <X className="w-5 h-5 text-white" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Code */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.code} *
-                </label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      code: e.target.value.toUpperCase(),
-                    })
-                  }
-                  className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
-                    formErrors.code ? "border-[#ef4444]" : "border-[#27272a]"
-                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm font-mono`}
-                  placeholder="WELCOME2024"
-                />
-                {formErrors.code && (
-                  <p className="text-[#ef4444] text-xs mt-1">
-                    {formErrors.code}
-                  </p>
-                )}
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
-                  placeholder="Optional description"
-                />
-              </div>
-
-              {/* Promo Code Type */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Promo Code Type *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, promoCodeType: "movie" })}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.promoCodeType === "movie"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    Movie
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, promoCodeType: "subscription" })}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.promoCodeType === "subscription"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    Subscription
-                  </button>
-                </div>
-              </div>
-
-              {/* Discount Type */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.discountType} *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, discountType: "percentage" })
-                    }
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.discountType === "percentage"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    {t.promoCodes.percentageLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, discountType: "amount" })
-                    }
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.discountType === "amount"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    {t.promoCodes.fixedLabel}
-                  </button>
-                </div>
-              </div>
-
-              {/* Discount Value */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.discountValue} *
-                </label>
-                <input
-                  type="number"
-                  value={formData.discountValue}
-                  onChange={(e) =>
-                    setFormData({ ...formData, discountValue: e.target.value })
-                  }
-                  className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
-                    formErrors.discountValue
-                      ? "border-[#ef4444]"
-                      : "border-[#27272a]"
-                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-                  placeholder={
-                    formData.discountType === "percentage" ? "50" : "5"
-                  }
-                  min="0"
-                  max={
-                    formData.discountType === "percentage" ? "100" : undefined
-                  }
-                />
-                {formErrors.discountValue && (
-                  <p className="text-[#ef4444] text-xs mt-1">
-                    {formErrors.discountValue}
-                  </p>
-                )}
-              </div>
-
-              {/* Usage Limit */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.usageLimit} *
-                </label>
-                <input
-                  type="number"
-                  value={formData.usageLimit}
-                  onChange={(e) =>
-                    setFormData({ ...formData, usageLimit: e.target.value })
-                  }
-                  className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
-                    formErrors.usageLimit
-                      ? "border-[#ef4444]"
-                      : "border-[#27272a]"
-                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-                  placeholder="1000"
-                  min="1"
-                />
-                {formErrors.usageLimit && (
-                  <p className="text-[#ef4444] text-xs mt-1">
-                    {formErrors.usageLimit}
-                  </p>
-                )}
-              </div>
-
-              {/* Expiration Date */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.expiresAt} *
-                </label>
-                <input
-                  type="date"
-                  value={formData.expiresAt}
-                  onChange={(e) =>
-                    setFormData({ ...formData, expiresAt: e.target.value })
-                  }
-                  className={`w-full bg-[#0a0a0a] text-white px-4 py-2.5 rounded-lg border ${
-                    formErrors.expiresAt
-                      ? "border-[#ef4444]"
-                      : "border-[#27272a]"
-                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-                />
-                {formErrors.expiresAt && (
-                  <p className="text-[#ef4444] text-xs mt-1">
-                    {formErrors.expiresAt}
-                  </p>
-                )}
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  {t.promoCodes.status}
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, status: "active" })
-                    }
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.status === "active"
-                        ? "bg-[#22c55e] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    {t.promoCodes.active}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, status: "inactive" })
-                    }
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      formData.status === "inactive"
-                        ? "bg-[#71717a] text-white"
-                        : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
-                    }`}
-                  >
-                    {t.promoCodes.inactive}
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-[#27272a]">
-                <button
-                  onClick={handleCloseModal}
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#27272a] text-white text-sm hover:bg-[#3f3f46] transition-colors disabled:opacity-50"
-                >
-                  {t.promoCodes.cancel}
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {isSubmitting
-                    ? "Saving..."
-                    : `${editingPromo ? t.promoCodes.updateBtn : t.promoCodes.createBtn} ${t.promoCodes.code}`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromoCodeFormModal
+        isOpen={showModal}
+        isEditing={!!editingPromo}
+        formData={formData}
+        setFormData={setFormData}
+        formErrors={formErrors}
+        isSubmitting={isSubmitting}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+        t={t}
+      />
 
       <ConfirmDialog
         isOpen={!!deletePromo}

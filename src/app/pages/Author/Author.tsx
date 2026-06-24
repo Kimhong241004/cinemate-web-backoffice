@@ -10,10 +10,10 @@ import {
   Upload,
   Link,
 } from "lucide-react";
-import { useLanguage } from "../context/LanguageContext";
-import Pagination from "../components/shared/Pagination";
-import { authorService } from "../../api/services/authorService";
-import ConfirmDialog from "../components/shared/ConfirmDialog";
+import { useLanguage } from "../../context/LanguageContext";
+import Pagination from "../../components/shared/Pagination";
+import { authorService } from "../../../api/services/authorService";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
 
 interface Author {
   id: number;
@@ -221,7 +221,7 @@ const Author = () => {
           </div>
           <button
             onClick={() => handleOpenModal()}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             {t.author.addAuthor}
@@ -323,8 +323,8 @@ const Author = () => {
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => setViewAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Eye className="w-4 h-4 text-[#f97316]" /></button>
-                        <button onClick={() => handleOpenModal(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Edit className="w-4 h-4 text-[#3b82f6]" /></button>
+                        <button onClick={() => setViewAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Eye className="w-4 h-4 text-[#3b82f6]" /></button>
+                        <button onClick={() => handleOpenModal(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Edit className="w-4 h-4 text-[#6C5CE7]" /></button>
                         <button onClick={() => setDeleteAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Trash2 className="w-4 h-4 text-[#ef4444]" /></button>
                       </div>
                     </td>
@@ -448,7 +448,7 @@ const Author = () => {
               {/* Actions */}
               <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-4 border-t border-[#27272a]">
                 <button onClick={handleCloseModal} disabled={isSubmitting} className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#27272a] text-white text-sm hover:bg-[#3f3f46] transition-colors disabled:opacity-50">{t.author.cancel}</button>
-                <button onClick={handleSubmitRequest} disabled={isSubmitting} className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+                <button onClick={handleSubmitRequest} disabled={isSubmitting} className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
                   {editingAuthor ? t.author.editAuthor : t.author.addAuthor}
                 </button>
               </div>

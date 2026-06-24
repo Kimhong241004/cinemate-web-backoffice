@@ -14,7 +14,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, disabled = false, s
 
   const btnBase = 'min-w-[36px] h-9 px-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center';
   const btnIdle = `${btnBase} bg-[#18181b] border border-[#27272a] text-white hover:bg-[#27272a]`;
-  const btnActive = `${btnBase} bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white shadow-md shadow-[#ef4444]/20`;
+  const btnActive = `${btnBase} bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white shadow-md shadow-[#6C5CE7]/20`;
   const btnNav = 'h-9 px-2.5 rounded-lg bg-[#18181b] border border-[#27272a] text-[#71717a] hover:bg-[#27272a] hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center';
 
   // Build page list with ellipsis

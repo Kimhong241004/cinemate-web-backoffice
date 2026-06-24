@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import Pagination from "../components/shared/Pagination";
+import Pagination from "../../components/shared/Pagination";
 import {
   Plus,
   Edit,
@@ -19,10 +19,10 @@ import {
   EyeOff,
   Settings,
 } from "lucide-react";
-import { useLanguage } from "../context/LanguageContext";
-import { adminService, AdminFromApi } from "../../api/services/adminService";
-import ConfirmDialog from "../components/shared/ConfirmDialog";
-import ImageUploader from "../components/shared/ImageUploader";
+import { useLanguage } from "../../context/LanguageContext";
+import { adminService, AdminFromApi } from "../../../api/services/adminService";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import ImageUploader from "../../components/shared/ImageUploader";
 
 interface SystemUser {
   id: number;
@@ -365,7 +365,7 @@ const UserSystem = () => {
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             <span>{t.userSystem.addUser}</span>
@@ -529,7 +529,7 @@ const UserSystem = () => {
                         onClick={() => handleEditUser(user)}
                         className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
                       >
-                        <Edit className="w-4 h-4 text-[#3b82f6]" />
+                        <Edit className="w-4 h-4 text-[#6C5CE7]" />
                       </button>
                       <button
                         onClick={() => handleBanUser(user)}
@@ -720,7 +720,7 @@ const UserSystem = () => {
               <button
                 onClick={editUser ? handleUpdateUser : handleAddUser}
                 disabled={isSaving}
-                className="px-4 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving
                   ? "..."

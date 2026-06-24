@@ -14,9 +14,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { profileService } from "../../api/services/profileService";
-import { settingService } from "../../api/services/settingService";
-import { useProfile } from "../context/ProfileContext";
+import { profileService } from "../../../api/services/profileService";
+import { settingService } from "../../../api/services/settingService";
+import { useProfile } from "../../context/ProfileContext";
 
 type Tab = "profile" | "security" | "configuration";
 
@@ -32,7 +32,7 @@ const Toggle = ({
   <button
     onClick={() => onChange(!enabled)}
     className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-      enabled ? "bg-gradient-to-r from-[#ef4444] to-[#f97316]" : "bg-[#3f3f46]"
+      enabled ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63]" : "bg-[#3f3f46]"
     }`}
   >
     <div
@@ -57,7 +57,7 @@ const Field = ({
   <div>
     <label className="block text-white text-sm font-medium mb-1.5">
       {label}
-      {required && <span className="text-[#f97316] ml-0.5">*</span>}
+      {required && <span className="text-[#6C5CE7] ml-0.5">*</span>}
     </label>
     {children}
     {hint && <p className="text-[#52525b] text-xs mt-1.5">{hint}</p>}
@@ -68,7 +68,7 @@ const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
   <input
     {...props}
     className={`w-full px-4 py-2.5 bg-[#0a0a0a] border border-[#27272a] rounded-lg text-white text-sm
-      focus:outline-none focus:border-[#f97316] transition-colors placeholder-[#52525b]
+      focus:outline-none focus:border-[#6C5CE7] transition-colors placeholder-[#52525b]
       disabled:text-[#52525b] disabled:cursor-not-allowed ${props.className ?? ""}`}
   />
 );
@@ -78,7 +78,7 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
     <select
       {...props}
       className={`w-full px-4 py-2.5 bg-[#0a0a0a] border border-[#27272a] rounded-lg text-white text-sm
-        focus:outline-none focus:border-[#f97316] transition-colors appearance-none cursor-pointer ${props.className ?? ""}`}
+        focus:outline-none focus:border-[#6C5CE7] transition-colors appearance-none cursor-pointer ${props.className ?? ""}`}
     />
     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b] pointer-events-none" />
   </div>
@@ -86,7 +86,7 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 
 const SectionCard = ({
   icon: Icon,
-  iconColor = "text-[#f97316]",
+  iconColor = "text-[#6C5CE7]",
   title,
   description,
   children,
@@ -111,7 +111,7 @@ const SectionCard = ({
         </div>
       </div>
       {badge && (
-        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[#f97316]/10 text-[#f97316] border border-[#f97316]/20">
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[#6C5CE7]/10 text-[#6C5CE7] border border-[#6C5CE7]/20">
           {badge}
         </span>
       )}
@@ -346,7 +346,7 @@ const Settings = () => {
         <button
           onClick={handleSaveProfile}
           disabled={isSaving || profileLoading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isSaving ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -361,7 +361,7 @@ const Settings = () => {
         <button
           onClick={handleChangePassword}
           disabled={isChangingPassword}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isChangingPassword ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -375,7 +375,7 @@ const Settings = () => {
       <button
         onClick={handleSaveConfiguration}
         disabled={isSavingConfig || bakongLoading}
-        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-sm disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isSavingConfig ? (
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -424,13 +424,13 @@ const Settings = () => {
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-3 text-sm font-medium transition-colors relative ${
               activeTab === tab.key
-                ? "text-[#f97316]"
+                ? "text-[#6C5CE7]"
                 : "text-[#71717a] hover:text-white"
             }`}
           >
             {tab.label}
             {activeTab === tab.key && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] rounded-t" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-t" />
             )}
           </button>
         ))}
@@ -469,7 +469,7 @@ const Settings = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 w-7 h-7 bg-gradient-to-br from-[#ef4444] to-[#f97316] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
+                  className="absolute bottom-0 right-0 w-7 h-7 bg-gradient-to-br from-[#6C5CE7] to-[#FF2E63] rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
                 >
                   <Camera className="w-3.5 h-3.5 text-white" />
                 </button>
@@ -536,7 +536,7 @@ const Settings = () => {
         <div className="space-y-4">
           <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 space-y-5">
             <div className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-[#f97316]" />
+              <Lock className="w-5 h-5 text-[#6C5CE7]" />
               <h2 className="text-white font-semibold">Change Password</h2>
             </div>
             {securityMsg && (
@@ -580,7 +580,7 @@ const Settings = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-[#27272a] flex items-center justify-center">
-                  <Lock className="w-4 h-4 text-[#f97316]" />
+                  <Lock className="w-4 h-4 text-[#6C5CE7]" />
                 </div>
                 <div>
                   <p className="text-white text-sm font-semibold">

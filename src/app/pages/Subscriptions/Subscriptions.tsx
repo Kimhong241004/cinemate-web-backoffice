@@ -12,14 +12,14 @@ import {
   Check,
   TrendingUp,
 } from "lucide-react";
-import { useLanguage } from "../context/LanguageContext";
-import ConfirmDialog from "../components/shared/ConfirmDialog";
-import Pagination from "../components/shared/Pagination";
+import { useLanguage } from "../../context/LanguageContext";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import Pagination from "../../components/shared/Pagination";
 import {
   planService,
   PlanFromApi,
   GetPlansParams,
-} from "../../api/services/planService";
+} from "../../../api/services/planService";
 
 interface Plan {
   id: number;
@@ -39,6 +39,7 @@ const formatPrice = (n: number) => `${new Intl.NumberFormat('en-US').format(n)} 
 
 const Subscriptions = () => {
   const { t } = useLanguage();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState<"all" | number>("all"); // Default to all statuses
@@ -223,12 +224,14 @@ const Subscriptions = () => {
             });
             setShowCreateModal(true);
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#ef4444] to-[#f97316] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity self-start sm:self-auto"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-lg text-white text-sm font-bold hover:opacity-90 transition-opacity self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           {t.subscriptions.createPlan}
         </button>
       </div>
+
+
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -273,9 +276,9 @@ const Subscriptions = () => {
         <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#71717a] text-sm">{t.subscriptions.avgPrice}</p>
-            <DollarSign className="w-4 h-4 text-[#f97316]" />
+            <DollarSign className="w-4 h-4 text-[#6C5CE7]" />
           </div>
-          <p className="text-[#f97316] text-2xl font-bold">
+          <p className="bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] bg-clip-text text-transparent text-2xl font-bold">
             {formatPrice(totalPlansCount > 0
               ? Math.round(plans.reduce((sum, plan) => sum + plan.price, 0) / totalPlansCount)
               : 0)}
@@ -483,7 +486,7 @@ const Subscriptions = () => {
                         onClick={() => openEditModal(plan)}
                         className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
                       >
-                        <Edit className="w-4 h-4 text-[#f97316]" />
+                        <Edit className="w-4 h-4 text-[#6C5CE7]" />
                       </button>
                       <button
                         onClick={() => {
@@ -592,9 +595,9 @@ const Subscriptions = () => {
                     onClick={() =>
                       setFormData({ ...formData, billing_cycle: "monthly" })
                     }
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       formData.billing_cycle === "monthly"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
+                        ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white"
                         : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
                     }`}
                   >
@@ -604,9 +607,9 @@ const Subscriptions = () => {
                     onClick={() =>
                       setFormData({ ...formData, billing_cycle: "yearly" })
                     }
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       formData.billing_cycle === "yearly"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
+                        ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white"
                         : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
                     }`}
                   >
@@ -616,9 +619,9 @@ const Subscriptions = () => {
                     onClick={() =>
                       setFormData({ ...formData, billing_cycle: "weekly" })
                     }
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       formData.billing_cycle === "weekly"
-                        ? "bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white"
+                        ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white"
                         : "bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]"
                     }`}
                   >
@@ -668,7 +671,7 @@ const Subscriptions = () => {
               </button>
               <button
                 onClick={showCreateModal ? handleCreate : handleEdit}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 {showCreateModal
                   ? t.subscriptions.createBtn

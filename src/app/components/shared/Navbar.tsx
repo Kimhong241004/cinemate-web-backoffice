@@ -204,7 +204,7 @@ const Navbar = () => {
                     className="absolute left-[26px] rounded-full size-[8px] top-[4px]"
                     style={{
                       backgroundImage:
-                        "linear-gradient(90deg, rgb(231, 0, 11) 0%, rgb(231, 33, 11) 7.1429%, rgb(232, 49, 10) 14.286%, rgb(232, 62, 10) 21.429%, rgb(232, 73, 9) 28.571%, rgb(232, 82, 9) 35.714%, rgb(232, 91, 8) 42.857%, rgb(232, 100, 7) 50%, rgb(232, 107, 7) 57.143%, rgb(232, 115, 6) 64.286%, rgb(231, 122, 5) 71.429%, rgb(231, 130, 4) 78.571%, rgb(230, 136, 2) 85.714%, rgb(229, 143, 1) 92.857%, rgb(228, 150, 0) 100%)",
+                        "linear-gradient(90deg, #6C5CE7 0%, #FF2E63 100%)",
                     }}
                   />
                 )}
@@ -307,12 +307,11 @@ const Navbar = () => {
                       setShowLogoutConfirm(true);
                     }}
                   >
-                    <LogOut className="w-4 h-4 text-[#f97316]" />
+                    <LogOut className="w-4 h-4 text-[#FF2E63]" />
                     <span
                       className="bg-clip-text text-transparent"
                       style={{
-                        backgroundImage:
-                          "linear-gradient(90deg, rgb(231, 0, 11) 0%, rgb(231, 33, 11) 7.1429%, rgb(232, 49, 10) 14.286%, rgb(232, 62, 10) 21.429%, rgb(232, 73, 9) 28.571%, rgb(232, 82, 9) 35.714%, rgb(232, 91, 8) 42.857%, rgb(232, 100, 7) 50%, rgb(232, 107, 7) 57.143%, rgb(232, 115, 6) 64.286%, rgb(231, 122, 5) 71.429%, rgb(231, 130, 4) 78.571%, rgb(230, 136, 2) 85.714%, rgb(229, 143, 1) 92.857%, rgb(228, 150, 0) 100%)",
+                        backgroundImage: "linear-gradient(90deg, #6C5CE7 0%, #FF2E63 100%)",
                       }}
                     >
                       {t.navbar.logout}
@@ -331,7 +330,7 @@ const Navbar = () => {
         message="Are you sure you want to log out of your account?"
         confirmLabel="Log out"
         cancelLabel="Stay"
-        variant="warning"
+        variant="brand"
         onConfirm={() => {
           logout();
           setShowLogoutConfirm(false);

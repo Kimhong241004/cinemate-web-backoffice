@@ -35,9 +35,9 @@ export const en = {
 
   // Sidebar
   sidebar: {
-    brandName: 'MOITV',
+    brandName: 'CINEMATE',
     brandTagline: 'All Khmer Media',
-    footer: '© 2026 MOITV. All Khmer Media Platform',
+    footer: '© 2026 CINEMATE. All Khmer Media Platform',
 
     // Sections
     sections: {
@@ -46,7 +46,9 @@ export const en = {
       contentManagement: 'CONTENT MANAGEMENT',
       pages: 'PAGES',
       financial: 'FINANCIAL',
+      party: 'PARTY',
       system: 'SYSTEM',
+
     },
 
     // Menu Items
@@ -62,8 +64,10 @@ export const en = {
       transactions: 'Transactions',
       promoCodes: 'Promo Codes',
       subscriptions: 'Subscriptions',
+      tickets: 'Tickets',
       userSystem: 'User System',
       settings: 'Settings',
+      rooms: 'Rooms',
     },
   },
 
@@ -266,7 +270,7 @@ export const en = {
     invalidCredentials: 'Invalid email or password',
     errorOccurred: 'An error occurred. Please try again.',
     adminPortal: 'Admin Portal',
-    footerText: '© 2026 MOITV. All Khmer Media Platform',
+    footerText: '© 2026 CINEMATE. All Khmer Media Platform',
   },
 
   // Profile Settings
@@ -383,7 +387,107 @@ export const en = {
     allStatus: 'All Status',
     allPeriods: 'All Periods',
     editBtn: 'Edit Plan',
+    plansTab: 'Plans',
+    ticketsTab: 'Tickets',
+    tickets: {
+      title: 'Ticket Management',
+      subtitle: 'Manage ticket pricing by movie, series, season and per episode',
+      createTicket: 'Create Ticket',
+      editTicket: 'Edit Ticket',
+      deleteTicket: 'Delete Ticket',
+      ticketDetails: 'Ticket Details',
+      ticketType: 'Ticket Type',
+      ticketTypePlaceholder: 'Select ticket type',
+      movie: 'Movie',
+      series: 'Series',
+      season: 'Season',
+      perEpisode: 'Episode',
+      totalTickets: 'Total Tickets',
+      totalTicketsDesc: 'All ticket types',
+      activeTickets: 'Active Tickets',
+      activeTicketsDesc: 'Currently active',
+      inactiveTickets: 'Inactive Tickets',
+      inactiveTicketsDesc: 'Currently inactive',
+      avgPrice: 'Average Price',
+      avgPriceDesc: 'Average price per ticket',
+
+      description: 'Description',
+      price: 'Price',
+      billingCycle: 'Billing Cycle',
+      oneTime: 'One-Time',
+      monthly: 'Monthly',
+      yearly: 'Yearly',
+      lifetime: 'Lifetime',
+      status: 'Status',
+      active: 'Active',
+      inactive: 'Inactive',
+      actions: 'Actions',
+      searchPlaceholder: 'Search tickets...',
+      noTicketsFound: 'No tickets found',
+      createSuccess: 'Ticket created successfully',
+      updateSuccess: 'Ticket updated successfully',
+      deleteSuccess: 'Ticket deleted successfully',
+      requiredFields: 'Please fill in all required fields',
+      deleteConfirm: 'Are you sure you want to delete this ticket?',
+      deleteConfirmEnd: 'This action cannot be undone.',
+      createBtn: 'Create',
+      updateBtn: 'Update',
+      cancel: 'Cancel',
+      close: 'Close',
+      editBtn: 'Edit Ticket',
+      allStatus: 'All Status',
+      allTypes: 'All Types',
+      typeFilter: 'Type',
+      showing: 'Showing',
+      to: 'to',
+      of: 'of',
+      entries: 'entries',
+    },
   },
+
+  // Rooms
+  rooms:{
+    title: 'Rooms',
+    subtitle: 'Manage watch party rooms',
+    searchPlaceholder: 'Search by room ID or name ',
+    totalRooms: 'Total Rooms',
+    activeNow: 'Active Now',
+    finishedToday: 'Finished Today',
+    totalParticipants: 'Total Participants',
+    table: {
+      no: 'NO.',
+      roomName: 'Room Name',
+      roomID: 'Room ID',
+      movie: 'Movie',
+      host: 'Host',
+      participants: 'Participants',
+      createdAt: 'Created At',
+      watchedAt: 'Watched At',
+      duration: 'Duration',
+      status: 'Status',
+      actions: 'Actions',
+    },
+    status: {
+      active: 'Active',
+      inactive: 'Inactive',
+      finished: 'Finished',
+    },
+    modal: {
+      title: 'Room Details',
+      roomId: 'Room ID',
+      movie: 'Movie',
+      host: 'Host',
+      createdAt: 'Created At',
+      startedAt: 'Started At',
+      participantsTitle: 'Participants & Access',
+      user: 'User',
+      access: 'Access',
+      joinedAt: 'Joined At',
+    },
+  },
+
+
+
 
   // Transactions
   transactions: {

@@ -30,7 +30,7 @@ const NotificationPanel = ({ onClose }: NotificationPanelProps) => {
         <div className="flex items-center gap-2">
           <h3 className="text-white text-sm font-bold">Notifications</h3>
           {notifications.filter((n) => !n.read).length > 0 && (
-            <span className="bg-[#ef4444] text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-xs px-2 py-0.5 rounded-full">
               {notifications.filter((n) => !n.read).length}
             </span>
           )}
@@ -54,7 +54,7 @@ const NotificationPanel = ({ onClose }: NotificationPanelProps) => {
           </button>
           <button
             onClick={clearAllNotifications}
-            className="text-xs text-[#ef4444] hover:text-[#f87171] transition-colors flex items-center gap-1"
+            className="text-xs text-[#6C5CE7] hover:text-[#FF2E63] transition-colors flex items-center gap-1"
           >
             <Trash2 className="w-3 h-3" />
             Clear all
@@ -89,7 +89,7 @@ const NotificationPanel = ({ onClose }: NotificationPanelProps) => {
                     {notification.type === 'success' ? (
                       <CheckCircle2 className="w-5 h-5 text-[#22c55e]" />
                     ) : notification.type === 'error' ? (
-                      <XCircle className="w-5 h-5 text-[#ef4444]" />
+                      <XCircle className="w-5 h-5 text-[#FF2E63]" />
                     ) : notification.type === 'warning' ? (
                       <AlertCircle className="w-5 h-5 text-[#f59e0b]" />
                     ) : (

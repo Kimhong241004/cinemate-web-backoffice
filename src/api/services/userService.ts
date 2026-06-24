@@ -11,6 +11,7 @@ export interface UserFromApi {
   follower_count: number;
   following_count: number;
   post_count: number;
+  account_type?: 'guest' | 'registered';
   status: number; // 1 = active, 0 = suspended
   is_blocked: boolean;
   last_login: string | null;
@@ -28,6 +29,7 @@ export interface GetUsersParams {
   page?: number;
   take?: number;
   search?: string;
+  user_type?: string;
 }
 
 export const userService = {

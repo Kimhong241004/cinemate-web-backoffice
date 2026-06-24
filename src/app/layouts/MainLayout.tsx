@@ -22,13 +22,13 @@ const MainLayout = () => {
 
   return (
     <ProfileProvider>
-      <div className="min-h-screen bg-[#0a0a0a]">
+      <div className="h-screen overflow-hidden bg-[#0a0a0a]">
         <Sidebar />
         <Navbar />
 
         <main
           className={`
-          pt-16 sm:pt-20 min-h-screen transition-all duration-300
+          pt-16 sm:pt-20 h-screen overflow-y-auto transition-all duration-300
           ml-0
           ${isSidebarCollapsed ? "lg:ml-[80px]" : "lg:ml-[255px]"}
         `}

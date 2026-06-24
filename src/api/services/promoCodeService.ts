@@ -5,7 +5,7 @@ export interface PromoCodeFromApi {
   global_id: string;
   code: string;
   description: string;
-  promo_code_type: "movie" | "subscription";
+  promo_code_type: "movie" | "subscription" | "series" | "season" | "episode";
   discount_amount: number;
   discount_type: "percentage" | "amount";
   expires_at: string;
@@ -28,7 +28,7 @@ export interface GetPromoCodesResponse {
 export interface CreatePromoCodePayload {
   code: string;
   description?: string;
-  promo_code_type: "movie" | "subscription";
+  promo_code_type: "movie" | "subscription" | "series" | "season" | "episode";
   discount_amount: number;
   discount_type: "percentage" | "amount";
   expires_at: string;
@@ -39,7 +39,7 @@ export interface CreatePromoCodePayload {
 export interface UpdatePromoCodePayload {
   code?: string;
   description?: string;
-  promo_code_type?: "movie" | "subscription";
+  promo_code_type?: "movie" | "subscription" | "series" | "season" | "episode";
   discount_amount?: number;
   discount_type?: "percentage" | "amount";
   expires_at?: string;

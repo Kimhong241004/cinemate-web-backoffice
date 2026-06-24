@@ -19,6 +19,34 @@ import { Link, useLocation } from 'react-router';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 
+// Custom cinema hall icon (screen + audience seating view)
+const HallIcon = ({ className, strokeWidth = 1.5 }: { className?: string; strokeWidth?: number }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    {/* Screen */}
+    <path d="M3 5h18" strokeWidth={strokeWidth + 0.5} />
+    {/* Stage/screen area */}
+    <path d="M5 5v3" />
+    <path d="M19 5v3" />
+    <path d="M5 8 Q12 10 19 8" />
+    {/* Row 1 seats */}
+    <circle cx="8"  cy="13" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="13" r="1" fill="currentColor" stroke="none" />
+    <circle cx="16" cy="13" r="1" fill="currentColor" stroke="none" />
+    {/* Row 2 seats */}
+    <circle cx="6"  cy="17" r="1" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="17" r="1" fill="currentColor" stroke="none" />
+    <circle cx="14" cy="17" r="1" fill="currentColor" stroke="none" />
+    <circle cx="18" cy="17" r="1" fill="currentColor" stroke="none" />
+    {/* Row 3 seats */}
+    <circle cx="5"  cy="21" r="1" fill="currentColor" stroke="none" />
+    <circle cx="9"  cy="21" r="1" fill="currentColor" stroke="none" />
+    <circle cx="13" cy="21" r="1" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="21" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const LogoSide = new URL('../../../assets/images/LogoSide.png', import.meta.url).href;
+
 const Sidebar = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
@@ -46,26 +74,38 @@ const Sidebar = () => {
         { icon: LayoutDashboard, label: t.sidebar.menu.dashboard, path: '/' },
       ],
     },
-    {
+
+     {
       title: t.sidebar.sections.content,
       items: [
-        { icon: FileText, label: t.sidebar.menu.contentLibrary, path: '/content-library' },
+        // hiden Content Library
+        /* { icon: FileText, label: t.sidebar.menu.contentLibrary, path: '/content-library' }, */
+
         { icon: Users, label: t.sidebar.menu.userManagement, path: '/user-management' },
       ],
     },
-    {
+
+   // hidden Content Managment 
+   /* {
       title: t.sidebar.sections.contentManagement,
       items: [
         { icon: Tv, label: t.sidebar.menu.tvChannels, path: '/tv-channels' },
         { icon: Radio, label: t.sidebar.menu.radio, path: '/radio' },
         { icon: Clapperboard, label: t.sidebar.menu.creators, path: '/creators' },
       ],
-    },
+    }, */
+
     {
       title: t.sidebar.sections.pages,
       items: [
         { icon: Film, label: t.sidebar.menu.movies, path: '/movies' },
         { icon: User, label: t.sidebar.menu.author, path: '/author' },
+      ],
+    },
+    {
+      title: t.sidebar.sections.party,
+      items: [
+        { icon: HallIcon, label: t.sidebar.menu.rooms, path: '/rooms' },
       ],
     },
     {
@@ -119,20 +159,8 @@ const Sidebar = () => {
         </button>
 
         {/* Logo - Sticky Header */}
-        <div className={`sticky top-0 p-4 flex items-center border-b border-[#18181b] bg-[#0a0a0a] z-10 transition-all ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
-          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#e7000b] to-[#e49600] flex items-center justify-center">
-            <span className="text-white font-bold text-xl">M</span>
-          </div>
-          {!isCollapsed && (
-            <div>
-              <h1 className="text-[#e49600] font-extrabold text-lg tracking-[2px] uppercase">
-                {t.sidebar.brandName}
-              </h1>
-              <p className="text-[#71717a] text-[10px] tracking-[0.5px]">
-                {t.sidebar.brandTagline}
-              </p>
-            </div>
-          )}
+        <div className="sticky top-0 p-4 flex items-center justify-center border-b border-[#18181b] bg-[#0a0a0a] z-10">
+          <img src={LogoSide} alt="Cinemate" className={`object-contain transition-all ${isCollapsed ? 'w-10 h-10' : 'h-12 w-auto max-w-[180px]'}`} />
         </div>
 
         {/* Navigation - Scrollable */}
@@ -173,7 +201,7 @@ const Sidebar = () => {
                         <div
                           className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
                           style={{
-                            background: 'linear-gradient(180deg, #ef4444 0%, #f97316 100%)',
+                            background: 'linear-gradient(180deg, #6C5CE7 0%, #FF2E63 100%)',
                           }}
                         />
                       )}

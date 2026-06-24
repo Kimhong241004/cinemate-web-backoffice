@@ -3,7 +3,7 @@
  * You can replace this with Axios if your team prefers it.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;

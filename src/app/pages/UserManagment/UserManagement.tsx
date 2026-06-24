@@ -7,10 +7,10 @@ import {
   UserX,
   UserCheck,
 } from "lucide-react";
-import { useLanguage } from "../context/LanguageContext";
-import { userService, UserFromApi } from "../../api/services/userService";
-import ConfirmDialog from "../components/shared/ConfirmDialog";
-import Pagination from "../components/shared/Pagination";
+import { useLanguage } from "../../context/LanguageContext";
+import { userService, UserFromApi } from "../../../api/services/userService";
+import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import Pagination from "../../components/shared/Pagination";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -44,6 +44,9 @@ const UserManagement = () => {
   >("all");
   const [userTypeFilter, setUserTypeFilter] = useState<
     "all" | "regular" | "creator"
+  >("all");
+  const [accountTypeFilter, setAccountTypeFilter] = useState<
+    "all" | "guest" | "registered"
   >("all");
   const filterDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +87,54 @@ const UserManagement = () => {
         search: debouncedSearch || undefined,
         user_type: userTypeFilter !== "all" ? userTypeFilter : undefined,
       });
-      setUsers(res.data);
+      // Add mock account_type: "registered" to API users
+      const usersWithAccountType = res.data.map(user => ({
+        ...user,
+        account_type: "registered" as const,
+      }));
+      
+      // Add 2 guest users if on first page
+      if (currentPage === 1) {
+        const guestUsers: UserFromApi[] = [
+          {
+            global_id: "gst-a2f9c1d",
+            username: "",
+            name: "",
+            email: "",
+            phone_number: null,
+            profile_url: null,
+            user_type: "regular",
+            follower_count: 0,
+            following_count: 0,
+            post_count: 0,
+            status: 1,
+            is_blocked: false,
+            last_login: "2026-06-09T10:00:00",
+            created_at: "2026-06-09T10:00:00",
+            account_type: "guest" as const,
+          },
+          {
+            global_id: "gst-7b8e3d2a",
+            username: "",
+            name: "",
+            email: "",
+            phone_number: null,
+            profile_url: null,
+            user_type: "regular",
+            follower_count: 0,
+            following_count: 0,
+            post_count: 0,
+            status: 1,
+            is_blocked: false,
+            last_login: "2026-06-08T09:15:00",
+            created_at: "2026-06-08T09:15:00",
+            account_type: "guest" as const,
+          },
+        ];
+        usersWithAccountType.push(...guestUsers);
+      }
+      
+      setUsers(usersWithAccountType);
       setTotal(res.total ?? res.data.length);
     } catch {
       showToast("Failed to load users", "error");
@@ -142,15 +192,23 @@ const UserManagement = () => {
     }
   };
 
-  // Client-side status filter (API doesn't support status param)
+  // Client-side status and account type filter (API doesn't support status param)
   const filteredUsers = users.filter((user) => {
-    if (statusFilter === "active") return user.status === 1;
-    if (statusFilter === "suspended") return user.status === 0;
+    if (statusFilter === "active") {
+      if (user.status !== 1) return false;
+    }
+    if (statusFilter === "suspended") {
+      if (user.status !== 0) return false;
+    }
+    if (accountTypeFilter !== "all") {
+      const userAccountType = user.account_type ?? 'guest';
+      if (userAccountType !== accountTypeFilter) return false;
+    }
     return true;
   });
 
   const activeFilterCount =
-    (statusFilter !== "all" ? 1 : 0) + (userTypeFilter !== "all" ? 1 : 0);
+    (statusFilter !== "all" ? 1 : 0) + (userTypeFilter !== "all" ? 1 : 0) + (accountTypeFilter !== "all" ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -239,7 +297,52 @@ const UserManagement = () => {
                               e.target.value as typeof statusFilter,
                             )
                           }
-                          className="w-4 h-4 accent-orange-500"
+                          className="w-4 h-4 accent-[#6C5CE7]"
+                        />
+                        <span className="text-white text-sm">
+                          {option.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Account Type Filter */}
+                <div className="border-t border-[#27272a] pt-4">
+                  <label className="text-[#71717a] text-xs font-bold uppercase tracking-wider mb-2 block">
+                    {t.userManagement.filters.accountType || "Account Type"}
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        value: "all",
+                        label: "All Types",
+                      },
+                      {
+                        value: "guest",
+                        label: "Guest",
+                      },
+                      {
+                        value: "registered",
+                        label: "Registered",
+                      },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-[#27272a] px-2 py-1.5 rounded transition-colors"
+                      >
+                        <input
+                          type="radio"
+                          name="accountType"
+                          value={option.value}
+                          checked={accountTypeFilter === option.value}
+                          onChange={(e) => {
+                            setAccountTypeFilter(
+                              e.target.value as typeof accountTypeFilter,
+                            );
+                            setCurrentPage(1);
+                          }}
+                          className="w-4 h-4 accent-[#6C5CE7]"
                         />
                         <span className="text-white text-sm">
                           {option.label}
@@ -284,7 +387,7 @@ const UserManagement = () => {
                             );
                             setCurrentPage(1);
                           }}
-                          className="w-4 h-4 accent-orange-500"
+                          className="w-4 h-4 accent-[#6C5CE7]"
                         />
                         <span className="text-white text-sm">
                           {option.label}
@@ -300,6 +403,7 @@ const UserManagement = () => {
                     onClick={() => {
                       setStatusFilter("all");
                       setUserTypeFilter("all");
+                      setAccountTypeFilter("all");
                       setSearchQuery("");
                     }}
                     className="w-full px-3 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white text-sm rounded-lg transition-colors font-medium"
@@ -323,6 +427,9 @@ const UserManagement = () => {
               </th>
               <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                 {t.userManagement.table.avatar}
+              </th>
+              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
+                Account Type
               </th>
               <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
                 {t.userManagement.table.phone}
@@ -372,12 +479,14 @@ const UserManagement = () => {
                     </div>
                     {(searchQuery ||
                       statusFilter !== "all" ||
-                      userTypeFilter !== "all") && (
+                      userTypeFilter !== "all" ||
+                      accountTypeFilter !== "all") && (
                       <button
                         onClick={() => {
                           setSearchQuery("");
                           setStatusFilter("all");
                           setUserTypeFilter("all");
+                          setAccountTypeFilter("all");
                         }}
                         className="mt-2 px-4 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white text-sm rounded-lg transition-colors font-medium"
                       >
@@ -388,7 +497,9 @@ const UserManagement = () => {
                 </td>
               </tr>
             ) : (
-              filteredUsers.map((user, index) => (
+              filteredUsers.map((user, index) => {
+                const isGuest = user.account_type === 'guest';
+                return (
                 <tr
                   key={user.global_id}
                   onClick={() => {
@@ -410,25 +521,37 @@ const UserManagement = () => {
                           <img
                             src={user.profile_url}
                             alt={user.name}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${isGuest ? "opacity-50" : ""}`}
                           />
                         ) : (
-                          <span className="text-white text-sm font-bold uppercase">
-                            {user.name?.charAt(0) ||
+                          <span className={`text-sm font-bold uppercase ${isGuest ? "text-[#71717a]" : "text-white"}`}>
+                            {isGuest ? "G" : (user.name?.charAt(0) ||
                               user.username?.charAt(0) ||
-                              "?"}
+                              "?")}
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="text-white text-sm font-semibold">
-                          {user.name || "—"}
+                        <p className={`text-sm font-semibold ${isGuest ? "text-[#71717a]" : "text-white"}`}>
+                          {isGuest ? "Guest" : (user.name || "—")}
                         </p>
-                        <p className="text-[#71717a] text-xs">
-                          {user.username}
+                        <p className={`text-xs ${isGuest ? "text-[#52525b]" : "text-[#71717a]"}`}>
+                          {isGuest ? user.global_id : user.username}
                         </p>
                       </div>
                     </div>
+                  </td>
+
+                  {/* Account Type */}
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    {(() => {
+                      const type = user.account_type ?? 'guest';
+                      const config = {
+                        guest:          { label: 'Guest',          cls: 'bg-[#27272a] text-[#71717a] border border-[#3f3f46]' },
+                        registered:     { label: 'Registered',     cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+                      }[type];
+                      return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${config.cls}`}>{config.label}</span>;
+                    })()}
                   </td>
 
                   {/* Phone Number */}
@@ -498,14 +621,14 @@ const UserManagement = () => {
                         >
                           <path
                             d="M0.708337 7.56492C0.652777 7.41525 0.652777 7.2506 0.708337 7.10092C1.24947 5.78883 2.16801 4.66695 3.34752 3.87752C4.52702 3.08809 5.91437 2.66667 7.33367 2.66667C8.75297 2.66667 10.1403 3.08809 11.3198 3.87752C12.4993 4.66695 13.4179 5.78883 13.959 7.10092C14.0146 7.2506 14.0146 7.41525 13.959 7.56492C13.4179 8.87702 12.4993 9.9989 11.3198 10.7883C10.1403 11.5778 8.75297 11.9992 7.33367 11.9992C5.91437 11.9992 4.52702 11.5778 3.34752 10.7883C2.16801 9.9989 1.24947 8.87702 0.708337 7.56492Z"
-                            stroke="#f97316"
+                            stroke="#6C5CE7"
                             strokeWidth="1.33333"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
                           <path
                             d="M9.33333 7.33333C9.33333 8.43789 8.43789 9.33333 7.33333 9.33333C6.22876 9.33333 5.33333 8.43789 5.33333 7.33333C5.33333 6.22876 6.22876 5.33333 7.33333 5.33333C8.43789 5.33333 9.33333 6.22876 9.33333 7.33333Z"
-                            stroke="#f97316"
+                            stroke="#6C5CE7"
                             strokeWidth="1.33333"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -535,8 +658,10 @@ const UserManagement = () => {
                         )}
                       </button>
 
+                      
+
                       {/* Upgrade to Creator */}
-                      <button
+                      {/* <button
                         className="p-2 rounded-lg hover:bg-[#27272a] transition-colors disabled:opacity-40"
                         title={t.userManagement.actions.upgrade}
                         disabled={user.user_type === "creator" || isSubmitting}
@@ -553,11 +678,12 @@ const UserManagement = () => {
                               : "text-[#08b00e]"
                           }`}
                         />
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
@@ -638,28 +764,6 @@ const UserManagement = () => {
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 py-4 border-t border-[#27272a]">
-                <div className="text-center">
-                  <p className="text-white text-lg font-bold">
-                    {selectedUser.follower_count}
-                  </p>
-                  <p className="text-[#71717a] text-xs mt-1">Followers</p>
-                </div>
-                <div className="text-center border-x border-[#27272a]">
-                  <p className="text-white text-lg font-bold">
-                    {selectedUser.following_count}
-                  </p>
-                  <p className="text-[#71717a] text-xs mt-1">Following</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-white text-lg font-bold">
-                    {selectedUser.post_count}
-                  </p>
-                  <p className="text-[#71717a] text-xs mt-1">Posts</p>
-                </div>
-              </div>
-
               {/* Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[#27272a]">
                 <div>
@@ -707,6 +811,8 @@ const UserManagement = () => {
                     ? t.userManagement.userDetail.suspend
                     : t.userManagement.userDetail.activate}
                 </button>
+               
+                {/* Upgrade to Creator button hidden
                 {selectedUser.user_type !== "creator" && (
                   <button
                     disabled={isSubmitting}
@@ -718,15 +824,16 @@ const UserManagement = () => {
                   >
                     <Star className="w-4 h-4" />
                     {t.userManagement.actions.upgrade}
-                  </button>
+                  </button> 
                 )}
+                */}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Upgrade to Creator — confirm */}
+      {/* Upgrade to Creator — confirm (hidden)
       <ConfirmDialog
         isOpen={showUpgradeConfirm && !!selectedUser}
         title={t.userManagement.upgradeModal.title}
@@ -742,6 +849,7 @@ const UserManagement = () => {
         onConfirm={handleUpgradeToCreator}
         onCancel={() => setShowUpgradeConfirm(false)}
       />
+      */}
 
       {/* Suspend / Activate — confirm */}
       <ConfirmDialog
