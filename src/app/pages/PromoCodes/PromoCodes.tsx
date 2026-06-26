@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Search,
-  SlidersHorizontal,
   Plus,
   Copy,
   Edit,
@@ -11,6 +10,7 @@ import { useNotification } from "../../context/NotificationContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
+import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
 import PromoCodeFormModal from "../../components/promocodes/PromoCodeFormModal";
 import {
   promoCodeService,
@@ -67,7 +67,6 @@ const PromoCodes = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
   const [deletePromo, setDeletePromo] = useState<PromoCode | null>(null);
@@ -182,10 +181,11 @@ const PromoCodes = () => {
       isValid = false;
     }
 
-    if (!formData.expiresAt) {
+    const expiresDate = new Date(formData.expiresAt);
+    if (!formData.expiresAt || isNaN(expiresDate.getTime())) {
       errors.expiresAt = t.promoCodes.expiresRequired;
       isValid = false;
-    } else if (new Date(formData.expiresAt) < new Date()) {
+    } else if (expiresDate < new Date()) {
       errors.expiresAt = t.promoCodes.expiresFuture;
       isValid = false;
     }
@@ -310,14 +310,6 @@ const PromoCodes = () => {
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = () => setShowStatusFilter(false);
-    if (showStatusFilter) {
-      document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
-    }
-  }, [showStatusFilter]);
-
   const startEntry = total === 0 ? 0 : (currentPage - 1) * ENTRIES_PER_PAGE + 1;
   const endEntry = Math.min(currentPage * ENTRIES_PER_PAGE, total);
 
@@ -355,88 +347,17 @@ const PromoCodes = () => {
           </div>
 
           {/* Status Filter */}
-          <div className="relative w-full sm:w-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowStatusFilter(!showStatusFilter);
-              }}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>{t.promoCodes.status}</span>
-              {selectedStatus && (
-                <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-              )}
-              <svg
-                className="w-4 h-4 ml-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-            {showStatusFilter && (
-              <div className="absolute z-10 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg">
-                <div className="p-2">
-                  <button
-                    onClick={() => {
-                      setSelectedStatus("");
-                      setShowStatusFilter(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[#27272a] rounded-lg transition-colors"
-                  >
-                    {t.promoCodes.allStatus}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedStatus("active");
-                      setShowStatusFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                      selectedStatus === "active"
-                        ? "bg-[#27272a] text-[#22c55e]"
-                        : "text-white hover:bg-[#27272a]"
-                    }`}
-                  >
-                    {t.promoCodes.active}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedStatus("inactive");
-                      setShowStatusFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                      selectedStatus === "inactive"
-                        ? "bg-[#27272a] text-[#71717a]"
-                        : "text-white hover:bg-[#27272a]"
-                    }`}
-                  >
-                    {t.promoCodes.inactive}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedStatus("expired");
-                      setShowStatusFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                      selectedStatus === "expired"
-                        ? "bg-[#27272a] text-[#ef4444]"
-                        : "text-white hover:bg-[#27272a]"
-                    }`}
-                  >
-                    {t.promoCodes.expired}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <StatusFilterDropdown
+            label={t.promoCodes.status}
+            allLabel={t.promoCodes.allStatus}
+            selectedValue={selectedStatus}
+            onSelect={setSelectedStatus}
+            options={[
+              { value: "active", label: t.promoCodes.active },
+              { value: "inactive", label: t.promoCodes.inactive },
+              { value: "expired", label: t.promoCodes.expired },
+            ]}
+          />
         </div>
 
         {/* Promo Codes List */}

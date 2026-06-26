@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Pagination from "../../components/shared/Pagination";
+import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
 import {
   Plus,
   Edit,
@@ -60,9 +61,7 @@ const UserSystem = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const statusFilterRef = useRef<HTMLDivElement>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editUser, setEditUser] = useState<SystemUser | null>(null);
@@ -111,18 +110,6 @@ const UserSystem = () => {
   useEffect(() => {
     fetchAdmins();
   }, [currentPage]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        statusFilterRef.current &&
-        !statusFilterRef.current.contains(event.target as Node)
-      )
-        setShowStatusFilter(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -387,42 +374,16 @@ const UserSystem = () => {
         </div>
 
         {/* Status Filter */}
-        <div className="relative w-full sm:w-auto" ref={statusFilterRef}>
-          <button
-            onClick={() => setShowStatusFilter(!showStatusFilter)}
-            className="w-full sm:w-auto px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-xl text-white text-sm hover:border-[#3f3f46] transition-colors flex items-center justify-center gap-2"
-          >
-            <span>{t.userSystem.status}</span>
-            {selectedStatus && (
-              <span className="w-1.5 h-1.5 bg-[#ef4444] rounded-full"></span>
-            )}
-          </button>
-          {showStatusFilter && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-xl shadow-lg overflow-hidden z-10">
-              <button
-                onClick={() => {
-                  setSelectedStatus("");
-                  setShowStatusFilter(false);
-                }}
-                className="w-full px-4 py-2.5 text-left text-white text-sm hover:bg-[#27272a] transition-colors"
-              >
-                {t.userSystem.allStatus}
-              </button>
-              {["1", "0"].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => {
-                    setSelectedStatus(status);
-                    setShowStatusFilter(false);
-                  }}
-                  className="w-full px-4 py-2.5 text-left text-white text-sm hover:bg-[#27272a] transition-colors"
-                >
-                  {status === "1" ? t.userSystem.active : t.userSystem.banned}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <StatusFilterDropdown
+          label={t.userSystem.status}
+          allLabel={t.userSystem.allStatus}
+          selectedValue={selectedStatus}
+          onSelect={setSelectedStatus}
+          options={[
+            { value: "1", label: t.userSystem.active },
+            { value: "0", label: t.userSystem.banned },
+          ]}
+        />
       </div>
 
       {/* Table */}

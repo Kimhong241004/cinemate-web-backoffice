@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import type { TranslationKeys } from "../../../i18n";
+import DateInput, { type DateRangeValue } from "../shared/DateInput";
 
 export interface PromoCodeFormData {
   code: string;
@@ -44,6 +45,20 @@ const PromoCodeFormModal = ({
   t,
 }: PromoCodeFormModalProps) => {
   if (!isOpen) return null;
+
+  const expiresAtDate = formData.expiresAt ? new Date(`${formData.expiresAt}T00:00:00`) : null;
+
+  const handleExpiresAtChange = (range: DateRangeValue) => {
+    const chosen = range.end ?? range.start;
+    if (!chosen) {
+      setFormData({ ...formData, expiresAt: "" });
+      return;
+    }
+    const y = chosen.getFullYear();
+    const m = String(chosen.getMonth() + 1).padStart(2, "0");
+    const d = String(chosen.getDate()).padStart(2, "0");
+    setFormData({ ...formData, expiresAt: `${y}-${m}-${d}` });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -226,20 +241,11 @@ const PromoCodeFormModal = ({
 
           {/* Expiration Date */}
           <div>
-            <label className="block text-white text-sm font-medium mb-2">
-              {t.promoCodes.expiresAt} *
-            </label>
-            <input
-              type="date"
-              value={formData.expiresAt}
-              onChange={(e) =>
-                setFormData({ ...formData, expiresAt: e.target.value })
-              }
-              className={`w-full bg-[#0a0a0a] text-white px-4 py-2.5 rounded-lg border ${
-                formErrors.expiresAt
-                  ? "border-[#ef4444]"
-                  : "border-[#27272a]"
-              } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
+            <DateInput
+              label={t.promoCodes.expiresAt}
+              error={!!formErrors.expiresAt}
+              initialRange={{ start: expiresAtDate, end: expiresAtDate }}
+              onChange={handleExpiresAtChange}
             />
             {formErrors.expiresAt && (
               <p className="text-[#ef4444] text-xs mt-1">

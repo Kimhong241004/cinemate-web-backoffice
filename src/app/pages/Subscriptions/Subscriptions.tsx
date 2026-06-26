@@ -15,6 +15,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
+import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
 import {
   planService,
   PlanFromApi,
@@ -42,11 +43,10 @@ const Subscriptions = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStatus, setSelectedStatus] = useState<"all" | number>("all"); // Default to all statuses
+  const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<
     "all" | "monthly" | "yearly" | "weekly"
   >("all");
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
   const [showPeriodFilter, setShowPeriodFilter] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -83,7 +83,7 @@ const Subscriptions = () => {
         take: entriesPerPage,
       };
       if (searchQuery) params.search = searchQuery;
-      if (selectedStatus !== "all") params.status = selectedStatus as number;
+      if (selectedStatus !== "") params.status = Number(selectedStatus);
       if (selectedPeriod !== "all") params.billing_cycle = selectedPeriod;
 
       const response = await planService.getPlans(params);
@@ -303,48 +303,16 @@ const Subscriptions = () => {
         </div>
 
         {/* Status Filter */}
-        <div className="relative">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowStatusFilter(!showStatusFilter);
-              setShowPeriodFilter(false);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>{t.subscriptions.status}</span>
-            {selectedStatus !== "all" && (
-              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-            )}
-          </button>
-          {showStatusFilter && (
-            <div className="absolute z-10 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg">
-              <div className="p-2">
-                {[
-                  { value: "all" as const, label: t.subscriptions.allStatus },
-                  { value: 1, label: t.subscriptions.active },
-                  { value: 0, label: t.subscriptions.inactive },
-                ].map(({ value, label }) => (
-                  <button
-                    key={String(value)}
-                    onClick={() => {
-                      setSelectedStatus(value);
-                      setShowStatusFilter(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                      selectedStatus === value
-                        ? "bg-[#27272a] text-[#ef4444]"
-                        : "text-white hover:bg-[#27272a]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <StatusFilterDropdown
+          label={t.subscriptions.status}
+          allLabel={t.subscriptions.allStatus}
+          selectedValue={selectedStatus}
+          onSelect={setSelectedStatus}
+          options={[
+            { value: "1", label: t.subscriptions.active },
+            { value: "0", label: t.subscriptions.inactive },
+          ]}
+        />
 
         {/* Period Filter */}
         <div className="relative">
@@ -352,7 +320,6 @@ const Subscriptions = () => {
             onClick={(e) => {
               e.stopPropagation();
               setShowPeriodFilter(!showPeriodFilter);
-              setShowStatusFilter(false);
             }}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
           >

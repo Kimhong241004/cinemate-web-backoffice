@@ -14,6 +14,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import Pagination from "../../components/shared/Pagination";
 import { authorService } from "../../../api/services/authorService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
+import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
 
 interface Author {
   id: number;
@@ -32,7 +33,6 @@ const Author = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
 
   const [authors, setAuthors] = useState<Author[]>([]);
   const [total, setTotal] = useState(0);
@@ -241,27 +241,16 @@ const Author = () => {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
           </div>
 
-          <div className="relative w-full sm:w-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowStatusFilter(!showStatusFilter); }}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-            >
-              <span>{t.author.status}</span>
-              {selectedStatus && <span className="w-2 h-2 rounded-full bg-[#ef4444]" />}
-              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showStatusFilter && (
-              <div className="absolute z-10 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg">
-                <div className="p-2">
-                  <button onClick={() => { setSelectedStatus(""); setShowStatusFilter(false); }} className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[#27272a] rounded-lg transition-colors">{t.author.allStatus}</button>
-                  <button onClick={() => { setSelectedStatus("active"); setShowStatusFilter(false); }} className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedStatus === "active" ? "bg-[#27272a] text-[#ef4444]" : "text-white hover:bg-[#27272a]"}`}>{t.author.active}</button>
-                  <button onClick={() => { setSelectedStatus("inactive"); setShowStatusFilter(false); }} className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedStatus === "inactive" ? "bg-[#27272a] text-[#ef4444]" : "text-white hover:bg-[#27272a]"}`}>{t.author.inactive}</button>
-                </div>
-              </div>
-            )}
-          </div>
+          <StatusFilterDropdown
+            label={t.author.status}
+            allLabel={t.author.allStatus}
+            selectedValue={selectedStatus}
+            onSelect={setSelectedStatus}
+            options={[
+              { value: "active", label: t.author.active },
+              { value: "inactive", label: t.author.inactive },
+            ]}
+          />
         </div>
 
         {/* Table */}

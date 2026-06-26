@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Search, SlidersHorizontal, Download, X, Check, Eye } from 'lucide-react';
+import { Search, Download, X, Check, Eye } from 'lucide-react';
 import Pagination from '../../components/shared/Pagination';
+import StatusFilterDropdown from '../../components/shared/StatusFilterDropdown';
 import { useLanguage } from '../../context/LanguageContext';
 import type { TransactionFromApi } from '../../../api/services/transactionService';
 
@@ -137,7 +138,6 @@ const Transactions = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
   const [viewTx, setViewTx] = useState<TransactionFromApi | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -171,7 +171,6 @@ const Transactions = () => {
   ];
 
   const statusOptions = [
-    { value: '',           label: t.transactions.allStatus },
     { value: 'pending',    label: t.transactions.pending },
     { value: 'processing', label: 'Processing' },
     { value: 'bank_paid',  label: 'Paid' },
@@ -219,36 +218,13 @@ const Transactions = () => {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
           </div>
 
-          <div className="relative w-full sm:w-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowStatusFilter(!showStatusFilter); }}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>{t.transactions.status}</span>
-              {selectedStatus && <span className="w-2 h-2 rounded-full bg-[#ef4444]" />}
-              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showStatusFilter && (
-              <div className="absolute z-10 mt-2 w-48 bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg">
-                <div className="p-2">
-                  {statusOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => { setSelectedStatus(opt.value); setShowStatusFilter(false); }}
-                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                        selectedStatus === opt.value ? 'bg-[#27272a] text-[#f97316]' : 'text-white hover:bg-[#27272a]'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <StatusFilterDropdown
+            label={t.transactions.status}
+            allLabel={t.transactions.allStatus}
+            selectedValue={selectedStatus}
+            onSelect={setSelectedStatus}
+            options={statusOptions}
+          />
         </div>
 
         {/* Table */}
