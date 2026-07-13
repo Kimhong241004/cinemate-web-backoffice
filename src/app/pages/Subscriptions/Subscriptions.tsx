@@ -15,7 +15,8 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
-import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
+import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from "../../components/shared/Table/Table";
 import {
   planService,
   PlanFromApi,
@@ -360,118 +361,79 @@ const Subscriptions = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                No.
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.planName}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.description}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.price}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.billingCycle}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.status}
-              </th>
-              <th className="px-4 py-4 text-center text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.subscriptions.actions}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#27272a]">
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center">
-                  <p className="text-[#71717a] text-sm">Loading plans...</p>
-                </td>
-              </tr>
-            ) : plans.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center">
-                  <p className="text-[#71717a] text-sm">
-                    {t.subscriptions.noPlansFound}
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              plans.map((plan, index) => (
-                <tr
-                  key={plan.global_id}
-                  className="hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                >
-                  <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap">
-                    {(currentPage - 1) * entriesPerPage + index + 1}
-                  </td>
-                  <td className="px-4 py-3.5 text-white text-sm font-medium whitespace-nowrap">
-                    {plan.name}
-                  </td>
-                  <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap max-w-xs truncate">
-                    {plan.description}
-                  </td>
-                  <td className="px-4 py-3.5 text-white text-sm font-bold whitespace-nowrap">
-                    {formatPrice(plan.price)}
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span className="inline-flex px-3 py-1.5 bg-[#27272a] text-white text-xs rounded-full font-medium">
-                      {plan.billing_cycle}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-3 py-1.5 rounded-full text-xs font-semibold ${
-                        plan.status === 1
-                          ? "bg-[#22c55e]/20 text-[#22c55e]"
-                          : "bg-[#71717a]/20 text-[#71717a]"
-                      }`}
+      <TableContainer>
+        <TableHead>
+          <Th>No.</Th>
+          <Th>{t.subscriptions.planName}</Th>
+          <Th>{t.subscriptions.description}</Th>
+          <Th>{t.subscriptions.price}</Th>
+          <Th>{t.subscriptions.billingCycle}</Th>
+          <Th>{t.subscriptions.status}</Th>
+          <Th align="center">{t.subscriptions.actions}</Th>
+        </TableHead>
+        <TableBody>
+          {loading ? (
+            <TableMessageRow colSpan={7}>Loading plans...</TableMessageRow>
+          ) : plans.length === 0 ? (
+            <TableMessageRow colSpan={7}>{t.subscriptions.noPlansFound}</TableMessageRow>
+          ) : (
+            plans.map((plan, index) => (
+              <TableRow key={plan.global_id}>
+                <Td>{(currentPage - 1) * entriesPerPage + index + 1}</Td>
+                <Td className="font-medium">{plan.name}</Td>
+                <Td className="max-w-xs truncate">{plan.description}</Td>
+                <Td className="font-bold">{formatPrice(plan.price)}</Td>
+                <Td>
+                  <span className="inline-flex px-3 py-1.5 bg-[#27272a] text-white text-xs rounded-full font-medium">
+                    {plan.billing_cycle}
+                  </span>
+                </Td>
+                <Td>
+                  <span
+                    className={`inline-flex px-3 py-1.5 rounded-full text-xs font-semibold ${
+                      plan.status === 1
+                        ? "bg-[#22c55e]/20 text-[#22c55e]"
+                        : "bg-[#71717a]/20 text-[#71717a]"
+                    }`}
+                  >
+                    {plan.status === 1
+                      ? t.subscriptions.active
+                      : t.subscriptions.inactive}
+                  </span>
+                </Td>
+                <Td align="center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setSelectedPlan(plan);
+                        setShowViewModal(true);
+                      }}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
                     >
-                      {plan.status === 1
-                        ? t.subscriptions.active
-                        : t.subscriptions.inactive}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          setSelectedPlan(plan);
-                          setShowViewModal(true);
-                        }}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Eye className="w-4 h-4 text-[#3b82f6]" />
-                      </button>
-                      <button
-                        onClick={() => openEditModal(plan)}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Edit className="w-4 h-4 text-[#6C5CE7]" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedPlan(plan);
-                          setShowDeleteModal(true);
-                        }}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-[#ef4444]" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                      <Eye className="w-4 h-4 text-[#6C5CE7]" />
+                    </button>
+                    <button
+                      onClick={() => openEditModal(plan)}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Edit className="w-4 h-4 text-[#6C5CE7]" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedPlan(plan);
+                        setShowDeleteModal(true);
+                      }}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-[#ef4444]" />
+                    </button>
+                  </div>
+                </Td>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </TableContainer>
 
       {/* Pagination */}
       <Pagination

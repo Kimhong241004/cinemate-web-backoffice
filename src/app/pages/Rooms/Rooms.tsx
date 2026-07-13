@@ -1,93 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
-import { Users2, Film, X, Eye, Search, SlidersHorizontal, MoreHorizontal, StopCircle, Ban } from 'lucide-react';
+import { useNotification } from '../../context/NotificationContext';
+import { Users2, Film, X, Eye, Search, MoreHorizontal, StopCircle, Ban } from 'lucide-react';
 import Pagination from '../../components/shared/Pagination';
-
-type RoomStatus = 'active' | 'inactive' | 'finished';
-
-interface ContentItem {
-  global_id: string;
-  title: string;
-  type: 'movie' | 'series' | 'episode' | 'season';
-  ticket_price: number;
-}
-
-interface Participant {
-  id: string;
-  name: string;
-  access: string;
-  joinedAt: string;
-}
-
-interface Room {
-  id: string;
-  name: string;
-  contents: ContentItem[];
-  host: string;
-  participants: number;
-  createdAt: string;
-  watchedAt: string;
-  duration: string;
-  status: RoomStatus;
-  participantList: Participant[];
-}
-
-const mockRooms: Room[] = [
-  {
-    id: '#4291',
-    name: 'Movie Night ',
-    contents: [
-      { global_id: 'cnt-001', title: 'Fast & Furious 10', type: 'movie', ticket_price: 2500 },
-      { global_id: 'cnt-002', title: 'Fast & Furious 9', type: 'movie', ticket_price: 2500 },
-    ],
-    host: 'Sokha Chan',
-    participants: 3,
-    createdAt: '27 May 2026 8:00pm',
-    watchedAt: '10 June 2026',
-    duration: '1h 42m',
-    status: 'finished',
-    participantList: [
-      { id: '1', name: 'Sokha Chan', access: 'Plan (free)', joinedAt: '2026-05-27T20:00:00' },
-      { id: '2', name: 'Dara', access: 'Ticket #17', joinedAt: '2026-05-27T20:05:00' },
-      { id: '3', name: 'Guest#1521', access: 'Ticket #18', joinedAt: '2026-05-27T20:10:00' },
-    ],
-  },
-  {
-    id: '#4292',
-    name: 'Avengers Night ',
-    contents: [
-      { global_id: 'cnt-003', title: 'Avengers: Endgame', type: 'movie', ticket_price: 2500 },
-      { global_id: 'cnt-004', title: 'Avengers: Infinity War', type: 'movie', ticket_price: 2500 },
-      { global_id: 'cnt-005', title: 'Loki S1 E1', type: 'episode', ticket_price: 1500 },
-    ],
-    host: 'Mony Rith',
-    participants: 2,
-    createdAt: '27 May 2026 7:00pm',
-    watchedAt: '30 May 2026',
-    duration: '2h 11m',
-    status: 'active',
-    participantList: [
-      { id: '1', name: 'Mony Rith', access: 'Plan (free)', joinedAt: '2026-05-27T19:00:00' },
-      { id: '2', name: 'Guest#2043', access: 'Ticket #21', joinedAt: '2026-05-27T19:03:00' },
-    ],
-  },
-  {
-    id: '#4290',
-    name: 'Spidey Room ',
-    contents: [
-      { global_id: 'cnt-006', title: 'Spider-Man: No Way Home', type: 'movie', ticket_price: 2500 },
-    ],
-    host: 'Virak Ly',
-    participants: 1,
-    createdAt: '26 May 2026 9:00pm',
-    watchedAt: '-',
-    duration: '-',
-    status: 'inactive',
-    participantList: [
-      { id: '1', name: 'Virak Ly', access: 'Plan (free)', joinedAt: '2026-05-26T21:00:00' },
-    ],
-  },
-];
+import ConfirmDialog from '../../components/shared/ConfirmDialog';
+import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from '../../components/shared/Table/Table';
+import { roomService, type RoomFromApi, type RoomStatus } from '../../../api/services/roomService';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -97,42 +16,85 @@ const statusConfig: Record<RoomStatus, { label: string; color: string }> = {
   finished: { label: 'Finished', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
 };
 
+const UNKNOWN_STATUS = { label: 'Unknown', color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' };
+const getStatusConfig = (status: RoomStatus) => statusConfig[status] ?? UNKNOWN_STATUS;
+
 export default function Rooms() {
   const { t } = useLanguage();
+  const { showToast } = useNotification();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | RoomStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<RoomStatus | ''>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [rooms, setRooms] = useState<RoomFromApi[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<RoomFromApi | null>(null);
   const [modalTab, setModalTab] = useState<'info' | 'contents' | 'participants'>('info');
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const [endRoomTarget, setEndRoomTarget] = useState<RoomFromApi | null>(null);
+  const [disableRoomTarget, setDisableRoomTarget] = useState<RoomFromApi | null>(null);
+  const [isActioning, setIsActioning] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
-        setShowFilterDropdown(false);
-      }
-      setOpenMenuId(null);
-    };
+    const handleClickOutside = () => setOpenMenuId(null);
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = mockRooms.filter((room) => {
-    const matchSearch =
-      room.id.toLowerCase().includes(search.toLowerCase()) ||
-      room.contents.some(c => c.title.toLowerCase().includes(search.toLowerCase())) ||
-      room.name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || room.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const fetchRooms = async () => {
+    setIsLoading(true);
+    try {
+      const res = await roomService.getRooms({
+        skip: (currentPage - 1) * ITEMS_PER_PAGE,
+        take: ITEMS_PER_PAGE,
+        search: search || undefined,
+        room_status: statusFilter || undefined,
+      });
+      setRooms(res.data);
+      setTotal(res.total);
+    } catch {
+      showToast('Failed to load rooms', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  useEffect(() => {
+    fetchRooms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, search, statusFilter]);
+
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+  const handleEndRoom = async () => {
+    if (!endRoomTarget) return;
+    setIsActioning(true);
+    try {
+      await roomService.endRoom(endRoomTarget.global_id);
+      showToast('Room ended', 'success');
+      setEndRoomTarget(null);
+      fetchRooms();
+    } catch {
+      showToast('Failed to end room', 'error');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleDisableRoom = async () => {
+    if (!disableRoomTarget) return;
+    setIsActioning(true);
+    try {
+      await roomService.disableRoom(disableRoomTarget.global_id);
+      showToast('Room disabled', 'success');
+      setDisableRoomTarget(null);
+      fetchRooms();
+    } catch {
+      showToast('Failed to disable room', 'error');
+    } finally {
+      setIsActioning(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -145,10 +107,10 @@ export default function Rooms() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: t.rooms.totalRooms,        value: '3', icon: Users2, color: 'text-[#3b82f6]' },
-          { label: t.rooms.activeNow,         value: '1', icon: Film,   color: 'text-[#22c55e]' },
-          { label: t.rooms.finishedToday,     value: '1', icon: Film,   color: 'text-[#f59e0b]' },
-          { label: t.rooms.totalParticipants, value: '6', icon: Users2, color: 'text-[#a855f7]' },
+          { label: t.rooms.totalRooms,        value: total,                                                  icon: Users2, color: 'text-[#3b82f6]' },
+          { label: t.rooms.activeNow,         value: rooms.filter(r => r.room_status === 'active').length,   icon: Film,   color: 'text-[#22c55e]' },
+          { label: t.rooms.finishedToday,     value: rooms.filter(r => r.room_status === 'finished').length, icon: Film,   color: 'text-[#f59e0b]' },
+          { label: t.rooms.totalParticipants, value: rooms.reduce((sum, r) => sum + r.current_participants, 0), icon: Users2, color: 'text-[#a855f7]' },
         ].map((stat, i) => (
           <div key={i} className="bg-[#18181b] border border-[#27272a] rounded-2xl p-4">
             <p className="text-[#71717a] text-xs mb-1">{stat.label}</p>
@@ -170,149 +132,109 @@ export default function Rooms() {
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
         </div>
 
-        <div className="relative" ref={filterDropdownRef}>
-          <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>Filter</span>
-            {statusFilter !== 'all' && (
-              <span className="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full font-bold">1</span>
-            )}
-          </button>
-
-          {showFilterDropdown && (
-            <div className="absolute right-0 mt-2 w-52 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-10">
-              <div className="p-4 space-y-2">
-                <label className="text-[#71717a] text-xs font-bold uppercase tracking-wider mb-2 block">Status</label>
-                {(['all', 'active', 'inactive', 'finished'] as const).map((val) => (
-                  <label key={val} className="flex items-center gap-2 cursor-pointer hover:bg-[#27272a] px-2 py-1.5 rounded transition-colors">
-                    <input
-                      type="radio"
-                      name="roomStatus"
-                      value={val}
-                      checked={statusFilter === val}
-                      onChange={() => { setStatusFilter(val); setCurrentPage(1); setShowFilterDropdown(false); }}
-                      className="w-4 h-4 accent-orange-500"
-                    />
-                    <span className="text-white text-sm capitalize">
-                      {val === 'all' ? t.common.all : t.rooms.status[val]}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <StatusFilterDropdown
+          label="Status"
+          allLabel={t.common.all}
+          selectedValue={statusFilter}
+          onSelect={(v) => { setStatusFilter(v as RoomStatus | ''); setCurrentPage(1); }}
+          options={[
+            { value: 'active', label: t.rooms.status.active },
+            { value: 'inactive', label: t.rooms.status.inactive },
+            { value: 'finished', label: t.rooms.status.finished },
+          ]}
+        />
       </div>
 
       {/* Table */}
-      <div className="bg-[#18181b] border border-[#27272a] rounded-2xl">
-        <div className="overflow-x-auto rounded-2xl">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-                {[
-                  t.rooms.table.no,
-                  t.rooms.table.roomName,
-                  'Total Content',
-                  t.rooms.table.host,
-                  t.rooms.table.participants,
-                  t.rooms.table.createdAt,
-                  t.rooms.table.watchedAt,
-                  t.rooms.table.status,
-                  t.rooms.table.actions,
-                ].map((col) => (
-                  <th key={col} className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#27272a]">
-              {paginated.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-[#71717a] text-sm">
-                    {t.common.noData}
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((room, idx) => (
-                  <tr key={room.id} className="hover:bg-[#27272a]/30 transition-colors">
-                    <td className="px-4 py-4 text-[#71717a] text-sm">
-                      {(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
-                    </td>
-                    <td className="px-4 py-4 text-white text-sm font-medium">{room.name}</td>
-                    <td className="px-4 py-4 text-white text-sm font-medium">{room.contents.length}</td>
-                    <td className="px-4 py-4 text-white text-sm">{room.host}</td>
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 text-white text-sm">
-                        <Users2 className="w-3.5 h-3.5 text-[#71717a]" />
-                        {room.participants}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-[#71717a] text-sm whitespace-nowrap">{room.createdAt}</td>
-                    <td className="px-4 py-4 text-[#71717a] text-sm whitespace-nowrap">{room.watchedAt}</td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[room.status].color}`}>
-                        {statusConfig[room.status].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => { setSelectedRoom(room); setModalTab('info'); }}
-                          className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                        >
-                          <Eye className="w-4 h-4 text-[#3b82f6]" />
-                        </button>
-                        <div className="relative">
+      <TableContainer>
+        <TableHead>
+          <Th>{t.rooms.table.no}</Th>
+          <Th>{t.rooms.table.roomName}</Th>
+          <Th>Total Content</Th>
+          <Th>{t.rooms.table.host}</Th>
+          <Th>{t.rooms.table.participants}</Th>
+          <Th>{t.rooms.table.createdAt}</Th>
+          <Th>{t.rooms.table.watchedAt}</Th>
+          <Th>{t.rooms.table.status}</Th>
+          <Th>{t.rooms.table.actions}</Th>
+        </TableHead>
+        <TableBody>
+          {isLoading ? (
+            <TableMessageRow colSpan={9}>{t.common.loading ?? 'Loading...'}</TableMessageRow>
+          ) : rooms.length === 0 ? (
+            <TableMessageRow colSpan={9}>{t.common.noData}</TableMessageRow>
+          ) : (
+            rooms.map((room, idx) => (
+              <TableRow key={room.global_id}>
+                <Td className="text-[#71717a]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</Td>
+                <Td className="font-medium">{room.room_name}</Td>
+                <Td className="font-medium">{room.total_movie}</Td>
+                <Td>-</Td>
+                <Td>
+                  <span className="inline-flex items-center gap-1 text-white text-sm">
+                    <Users2 className="w-3.5 h-3.5 text-[#71717a]" />
+                    {room.current_participants}
+                  </span>
+                </Td>
+                <Td className="text-[#71717a]">
+                  {new Date(room.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </Td>
+                <Td className="text-[#71717a]">-</Td>
+                <Td>
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusConfig(room.room_status).color}`}>
+                    {getStatusConfig(room.room_status).label}
+                  </span>
+                </Td>
+                <Td>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { setSelectedRoom(room); setModalTab('info'); }}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Eye className="w-4 h-4 text-[#6C5CE7]" />
+                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === room.global_id ? null : room.global_id); }}
+                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4 text-[#6C5CE7]" />
+                      </button>
+                      {openMenuId === room.global_id && (
+                        <div className="absolute right-0 mt-1 w-44 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-20 overflow-hidden">
                           <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === room.id ? null : room.id); }}
-                            className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setEndRoomTarget(room); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-[#27272a] transition-colors"
                           >
-                            <MoreHorizontal className="w-4 h-4 text-[#6C5CE7]" />
+                            <StopCircle className="w-4 h-4 text-[#f59e0b]" />
+                            End Room
                           </button>
-                          {openMenuId === room.id && (
-                            <div className="absolute right-0 mt-1 w-44 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-20 overflow-hidden">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-[#27272a] transition-colors"
-                              >
-                                <StopCircle className="w-4 h-4 text-[#f59e0b]" />
-                                End Room
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#ef4444] hover:bg-[#27272a] transition-colors"
-                              >
-                                <Ban className="w-4 h-4" />
-                                Disable Room
-                              </button>
-                            </div>
-                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setDisableRoomTarget(room); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#ef4444] hover:bg-[#27272a] transition-colors"
+                          >
+                            <Ban className="w-4 h-4" />
+                            Disable Room
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      )}
+                    </div>
+                  </div>
+                </Td>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </TableContainer>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-4 py-4 border-t border-[#27272a]">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        )}
-      </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       {/* View Modal */}
       {selectedRoom && (
@@ -320,7 +242,7 @@ export default function Rooms() {
           <div className="bg-[#18181b] border border-[#27272a] rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-[#27272a] flex-shrink-0">
-              <h2 className="text-white font-bold">{t.rooms.modal.title} {selectedRoom.id}</h2>
+              <h2 className="text-white font-bold">{t.rooms.modal.title}</h2>
               <button onClick={() => setSelectedRoom(null)} className="text-[#71717a] hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -336,7 +258,7 @@ export default function Rooms() {
                     modalTab === tab ? 'text-white' : 'text-[#71717a] hover:text-white'
                   }`}
                 >
-                  {tab === 'contents' ? `Contents (${selectedRoom.contents.length})` : tab === 'participants' ? `Participants (${selectedRoom.participantList.length})` : 'Info'}
+                  {tab === 'contents' ? `Contents (${selectedRoom.total_movie})` : tab === 'participants' ? `Participants (${selectedRoom.current_participants})` : 'Info'}
                   {modalTab === tab && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] rounded-full" />
                   )}
@@ -350,10 +272,10 @@ export default function Rooms() {
               {modalTab === 'info' && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {[
-                    { label: t.rooms.modal.host, value: selectedRoom.host },
-                    { label: 'Status', value: statusConfig[selectedRoom.status].label },
-                    { label: t.rooms.modal.createdAt, value: selectedRoom.createdAt },
-                    { label: t.rooms.modal.startedAt, value: selectedRoom.watchedAt },
+                    { label: t.rooms.modal.host, value: '-' },
+                    { label: 'Status', value: getStatusConfig(selectedRoom.room_status).label },
+                    { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString() },
+                    { label: t.rooms.modal.startedAt, value: '-' },
                   ].map((item) => (
                     <div key={item.label}>
                       <p className="text-[#71717a] text-xs">{item.label}</p>
@@ -375,24 +297,18 @@ export default function Rooms() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#27272a]">
-                      {selectedRoom.contents.map((c) => (
-                        <tr key={c.global_id}>
-                          <td className="px-3 py-2.5 text-white">{c.title}</td>
-                          <td className="px-3 py-2.5 capitalize text-[#71717a]">{c.type}</td>
-                          <td className="px-3 py-2.5 text-right">
-                            <span className="text-white font-medium">{new Intl.NumberFormat('en-US').format(c.ticket_price)}</span>
-                            <span className="text-[#f97316] ml-1">&#x17DB;</span>
-                          </td>
+                      {Array.from({ length: selectedRoom.total_movie }).map((_, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-2.5 text-white">-</td>
+                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
+                          <td className="px-3 py-2.5 text-right text-white">-</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-[#27272a]">
                         <td colSpan={2} className="px-3 py-2.5 text-[#71717a] text-xs font-bold uppercase">Total per new member</td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span className="text-white font-bold">{new Intl.NumberFormat('en-US').format(selectedRoom.contents.reduce((sum, c) => sum + c.ticket_price, 0))}</span>
-                          <span className="text-[#f97316] ml-1">&#x17DB;</span>
-                        </td>
+                        <td className="px-3 py-2.5 text-right text-white font-bold">-</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -411,19 +327,11 @@ export default function Rooms() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#27272a]">
-                      {selectedRoom.participantList.map((p) => (
-                        <tr key={p.id}>
-                          <td className="px-3 py-2.5 text-white">{p.name}</td>
-                          <td className="px-3 py-2.5">
-                            {p.access.toLowerCase().startsWith('ticket') ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">Purchase</span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">Plan</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 text-[#71717a]">
-                            {new Date(p.joinedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </td>
+                      {Array.from({ length: selectedRoom.current_participants }).map((_, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-2.5 text-white">-</td>
+                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
+                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
                         </tr>
                       ))}
                     </tbody>
@@ -434,6 +342,28 @@ export default function Rooms() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!endRoomTarget}
+        title="End Room"
+        message={`Are you sure you want to end "${endRoomTarget?.room_name}"? Participants will be disconnected.`}
+        confirmLabel="End Room"
+        variant="warning"
+        loading={isActioning}
+        onConfirm={handleEndRoom}
+        onCancel={() => setEndRoomTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!disableRoomTarget}
+        title="Disable Room"
+        message={`Are you sure you want to disable "${disableRoomTarget?.room_name}"? This room will no longer be accessible.`}
+        confirmLabel="Disable"
+        variant="danger"
+        loading={isActioning}
+        onConfirm={handleDisableRoom}
+        onCancel={() => setDisableRoomTarget(null)}
+      />
     </div>
   );
 }

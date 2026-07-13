@@ -14,7 +14,8 @@ import { useLanguage } from "../../context/LanguageContext";
 import Pagination from "../../components/shared/Pagination";
 import { authorService } from "../../../api/services/authorService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
-import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
+import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from "../../components/shared/Table/Table";
 
 interface Author {
   id: number;
@@ -254,75 +255,63 @@ const Author = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-                <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.number}</th>
-                <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.image}</th>
-                <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.authorName}</th>
-                <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.moviesCount}</th>
-                <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.status}</th>
-                <th className="px-4 py-4 text-center text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.author.actions}</th>
+        <TableContainer>
+          <TableHead>
+            <Th>{t.author.number}</Th>
+            <Th>{t.author.image}</Th>
+            <Th>{t.author.authorName}</Th>
+            <Th>{t.author.moviesCount}</Th>
+            <Th>{t.author.status}</Th>
+            <Th align="center">{t.author.actions}</Th>
+          </TableHead>
+          <TableBody>
+            {isLoadingData ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-[#71717a] text-sm">Loading...</p>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[#27272a]">
-              {isLoadingData ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
-                      <p className="text-[#71717a] text-sm">Loading...</p>
+            ) : authors.length === 0 ? (
+              <TableMessageRow colSpan={6}>{t.author.noFound}</TableMessageRow>
+            ) : (
+              authors.map((author, index) => (
+                <TableRow key={author.id}>
+                  <Td>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</Td>
+                  <Td>
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-[#27272a] flex items-center justify-center">
+                      {author.profile ? (
+                        <img src={author.profile} alt={author.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white text-sm font-bold uppercase">{author.name?.charAt(0) || '?'}</span>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              ) : authors.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <p className="text-[#71717a] text-sm">{t.author.noFound}</p>
-                  </td>
-                </tr>
-              ) : (
-                authors.map((author) => (
-                  <tr key={author.id} className="hover:bg-[rgba(255,255,255,0.03)] transition-colors">
-                    <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap">{(currentPage - 1) * ITEMS_PER_PAGE + authors.indexOf(author) + 1}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-[#27272a] flex items-center justify-center">
-                        {author.profile ? (
-                          <img src={author.profile} alt={author.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-white text-sm font-bold uppercase">{author.name?.charAt(0) || '?'}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="text-white text-sm font-medium">{author.name}</p>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="text-white text-sm">{author.moviesCount}</p>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                        author.status === "active"
-                          ? "bg-[#22c55e]/20 text-[#22c55e]"
-                          : "bg-[#71717a]/20 text-[#71717a]"
-                      }`}>
-                        {author.status === "active" ? t.author.active : t.author.inactive}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => setViewAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Eye className="w-4 h-4 text-[#3b82f6]" /></button>
-                        <button onClick={() => handleOpenModal(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Edit className="w-4 h-4 text-[#6C5CE7]" /></button>
-                        <button onClick={() => setDeleteAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Trash2 className="w-4 h-4 text-[#ef4444]" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </Td>
+                  <Td className="font-medium">{author.name}</Td>
+                  <Td>{author.moviesCount}</Td>
+                  <Td>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                      author.status === "active"
+                        ? "bg-[#22c55e]/20 text-[#22c55e]"
+                        : "bg-[#71717a]/20 text-[#71717a]"
+                    }`}>
+                      {author.status === "active" ? t.author.active : t.author.inactive}
+                    </span>
+                  </Td>
+                  <Td align="center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button onClick={() => setViewAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Eye className="w-4 h-4 text-[#6C5CE7]" /></button>
+                      <button onClick={() => handleOpenModal(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Edit className="w-4 h-4 text-[#6C5CE7]" /></button>
+                      <button onClick={() => setDeleteAuthor(author)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"><Trash2 className="w-4 h-4 text-[#ef4444]" /></button>
+                    </div>
+                  </Td>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </TableContainer>
 
         {/* Pagination */}
         <Pagination

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { X, AlertTriangle, Info, ShieldAlert } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, Info, ShieldAlert } from 'lucide-react';
 
-type Variant = 'danger' | 'warning' | 'info' | 'brand';
+type Variant = 'danger' | 'warning' | 'info' | 'success' | 'brand';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -30,6 +30,11 @@ const variantStyles: Record<Variant, { icon: React.ReactNode; confirmBtn: string
     icon: <Info className="w-6 h-6 text-[#3b82f6]" />,
     iconBg: 'bg-[rgba(59,130,246,0.12)]',
     confirmBtn: 'bg-[#3b82f6] hover:bg-[#2563eb]',
+  },
+  success: {
+    icon: <CheckCircle className="w-6 h-6 text-[#22c55e]" />,
+    iconBg: 'bg-[rgba(34,197,94,0.12)]',
+    confirmBtn: 'bg-[#22c55e] hover:bg-[#16a34a]',
   },
   brand: {
     icon: <AlertTriangle className="w-6 h-6 text-[#FF2E63]" />,

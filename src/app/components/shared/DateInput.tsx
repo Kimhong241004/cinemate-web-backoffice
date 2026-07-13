@@ -10,6 +10,7 @@ interface DateInputProps {
   label?: string;
   required?: boolean;
   error?: boolean;
+  requireFuture?: boolean;
   initialRange?: DateRangeValue;
   onChange?: (range: DateRangeValue) => void;
 }
@@ -131,6 +132,7 @@ const DateInput = ({
   label = "Date Range",
   required = true,
   error = false,
+  requireFuture = false,
   initialRange,
   onChange,
 }: DateInputProps) => {
@@ -144,6 +146,7 @@ const DateInput = ({
   const [customEditing, setCustomEditing] = useState(false);
   const [customText, setCustomText] = useState("");
   const [open, setOpen] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
   const [viewDate, setViewDate] = useState<Date>(range.start ?? new Date());
 
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -167,6 +170,14 @@ const DateInput = ({
     if (customEditing) customInputRef.current?.focus();
   }, [customEditing]);
 
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
   const openPanel = () => {
     setDraftRange(range);
     setPendingEdge(range.start && !range.end ? "end" : "start");
@@ -179,17 +190,24 @@ const DateInput = ({
   };
 
   const handleConfirm = () => {
+    const chosen = draftRange.end ?? draftRange.start;
+    if (requireFuture && chosen && chosen <= startOfDay(new Date())) {
+      setConfirmError("Expiration date must be in the future");
+      return;
+    }
     const finalRange: DateRangeValue = {
       start: draftRange.start,
       end: draftRange.end ?? draftRange.start,
     };
     setRange(finalRange);
     onChange?.(finalRange);
+    setConfirmError("");
     setOpen(false);
   };
 
   const handleCancel = () => {
     setDraftRange(range);
+    setConfirmError("");
     setOpen(false);
   };
 
@@ -241,6 +259,7 @@ const DateInput = ({
       setPendingEdge("start");
     }
     setActivePreset(null);
+    setConfirmError("");
   };
 
   const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long" });
@@ -424,21 +443,26 @@ const DateInput = ({
             })}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 mt-3 border-t border-[#27272a]">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 rounded-lg bg-[#27272a] text-white text-sm hover:bg-[#3f3f46] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="px-4 py-2 rounded-lg text-[#6C5CE7] text-sm font-semibold hover:bg-[#27272a] transition-colors"
-            >
-              Confirm
-            </button>
+          <div className="pt-3 mt-3 border-t border-[#27272a]">
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 rounded-lg bg-[#27272a] text-white text-sm hover:bg-[#3f3f46] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="px-4 py-2 rounded-lg text-[#6C5CE7] text-sm font-semibold hover:bg-[#27272a] transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+            {confirmError && (
+              <p className="text-[#ef4444] text-xs mt-2 text-right">{confirmError}</p>
+            )}
           </div>
         </div>
       )}

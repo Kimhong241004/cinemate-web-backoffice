@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Search,
-  SlidersHorizontal,
   X,
   Star,
   UserX,
@@ -11,6 +10,8 @@ import { useLanguage } from "../../context/LanguageContext";
 import { userService, UserFromApi } from "../../../api/services/userService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
+import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td } from "../../components/shared/Table/Table";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -38,17 +39,15 @@ const UserManagement = () => {
     message: string;
     type: "success" | "error";
   } | null>(null);
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "active" | "suspended"
-  >("all");
+    "" | "active" | "suspended"
+  >("");
   const [userTypeFilter, setUserTypeFilter] = useState<
     "all" | "regular" | "creator"
   >("all");
   const [accountTypeFilter, setAccountTypeFilter] = useState<
-    "all" | "guest" | "registered"
-  >("all");
-  const filterDropdownRef = useRef<HTMLDivElement>(null);
+    "" | "guest" | "registered"
+  >("");
 
   const [users, setUsers] = useState<UserFromApi[]>([]);
   const [total, setTotal] = useState(0);
@@ -63,20 +62,6 @@ const UserManagement = () => {
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        filterDropdownRef.current &&
-        !filterDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowFilterDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -200,7 +185,7 @@ const UserManagement = () => {
     if (statusFilter === "suspended") {
       if (user.status !== 0) return false;
     }
-    if (accountTypeFilter !== "all") {
+    if (accountTypeFilter !== "") {
       const userAccountType = user.account_type ?? 'guest';
       if (userAccountType !== accountTypeFilter) return false;
     }
@@ -208,7 +193,7 @@ const UserManagement = () => {
   });
 
   const activeFilterCount =
-    (statusFilter !== "all" ? 1 : 0) + (userTypeFilter !== "all" ? 1 : 0) + (accountTypeFilter !== "all" ? 1 : 0);
+    (statusFilter !== "" ? 1 : 0) + (userTypeFilter !== "all" ? 1 : 0) + (accountTypeFilter !== "" ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -233,288 +218,120 @@ const UserManagement = () => {
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
         </div>
 
-        <div className="relative" ref={filterDropdownRef}>
-          <button
-            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm hover:bg-[#27272a] transition-colors"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span>{t.userManagement.filter}</span>
-            {activeFilterCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-xs rounded-full font-bold">
-                {activeFilterCount}
-              </span>
-            )}
-            <svg
-              className={`w-4 h-4 ml-1 transition-transform ${showFilterDropdown ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusFilterDropdown
+            label={t.userManagement.filters.status}
+            allLabel={t.userManagement.filters.allStatus}
+            selectedValue={statusFilter}
+            onSelect={(v) => setStatusFilter(v as typeof statusFilter)}
+            options={[
+              { value: "active", label: t.userManagement.filters.active },
+              { value: "suspended", label: t.userManagement.filters.suspended },
+            ]}
+          />
+
+          <StatusFilterDropdown
+            label="Account Type"
+            allLabel="All Types"
+            selectedValue={accountTypeFilter}
+            onSelect={(v) => {
+              setAccountTypeFilter(v as typeof accountTypeFilter);
+              setCurrentPage(1);
+            }}
+            options={[
+              { value: "guest", label: "Guest" },
+              { value: "registered", label: "Registered" },
+            ]}
+          />
+
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => {
+                setStatusFilter("");
+                setUserTypeFilter("all");
+                setAccountTypeFilter("");
+                setSearchQuery("");
+              }}
+              className="px-3 py-2 text-xs text-[#71717a] hover:text-white transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          {showFilterDropdown && (
-            <div className="absolute right-0 mt-2 w-64 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-10">
-              <div className="p-4 space-y-4">
-                {/* Status Filter */}
-                <div>
-                  <label className="text-[#71717a] text-xs font-bold uppercase tracking-wider mb-2 block">
-                    {t.userManagement.filters.status}
-                  </label>
-                  <div className="space-y-2">
-                    {[
-                      {
-                        value: "all",
-                        label: t.userManagement.filters.allStatus,
-                      },
-                      {
-                        value: "active",
-                        label: t.userManagement.filters.active,
-                      },
-                      {
-                        value: "suspended",
-                        label: t.userManagement.filters.suspended,
-                      },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-[#27272a] px-2 py-1.5 rounded transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="status"
-                          value={option.value}
-                          checked={statusFilter === option.value}
-                          onChange={(e) =>
-                            setStatusFilter(
-                              e.target.value as typeof statusFilter,
-                            )
-                          }
-                          className="w-4 h-4 accent-[#6C5CE7]"
-                        />
-                        <span className="text-white text-sm">
-                          {option.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Account Type Filter */}
-                <div className="border-t border-[#27272a] pt-4">
-                  <label className="text-[#71717a] text-xs font-bold uppercase tracking-wider mb-2 block">
-                    {t.userManagement.filters.accountType || "Account Type"}
-                  </label>
-                  <div className="space-y-2">
-                    {[
-                      {
-                        value: "all",
-                        label: "All Types",
-                      },
-                      {
-                        value: "guest",
-                        label: "Guest",
-                      },
-                      {
-                        value: "registered",
-                        label: "Registered",
-                      },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-[#27272a] px-2 py-1.5 rounded transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="accountType"
-                          value={option.value}
-                          checked={accountTypeFilter === option.value}
-                          onChange={(e) => {
-                            setAccountTypeFilter(
-                              e.target.value as typeof accountTypeFilter,
-                            );
-                            setCurrentPage(1);
-                          }}
-                          className="w-4 h-4 accent-[#6C5CE7]"
-                        />
-                        <span className="text-white text-sm">
-                          {option.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* User Type Filter */}
-                {/* <div className="border-t border-[#27272a] pt-4">
-                  <label className="text-[#71717a] text-xs font-bold uppercase tracking-wider mb-2 block">
-                    {t.userManagement.filters.userType}
-                  </label>
-                  <div className="space-y-2">
-                    {[
-                      {
-                        value: "all",
-                        label: t.userManagement.filters.allUserTypes,
-                      },
-                      {
-                        value: "regular",
-                        label: t.userManagement.filters.regular,
-                      },
-                      {
-                        value: "creator",
-                        label: t.userManagement.filters.creator,
-                      },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-[#27272a] px-2 py-1.5 rounded transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="userType"
-                          value={option.value}
-                          checked={userTypeFilter === option.value}
-                          onChange={(e) => {
-                            setUserTypeFilter(
-                              e.target.value as typeof userTypeFilter,
-                            );
-                            setCurrentPage(1);
-                          }}
-                          className="w-4 h-4 accent-[#6C5CE7]"
-                        />
-                        <span className="text-white text-sm">
-                          {option.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div> */}
-
-                {/* Clear Filters */}
-                <div className="border-t border-[#27272a] pt-4">
-                  <button
-                    onClick={() => {
-                      setStatusFilter("all");
-                      setUserTypeFilter("all");
-                      setAccountTypeFilter("all");
-                      setSearchQuery("");
-                    }}
-                    className="w-full px-3 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white text-sm rounded-lg transition-colors font-medium"
-                  >
-                    {t.userManagement.clearAllFilters}
-                  </button>
-                </div>
-              </div>
-            </div>
+              {t.userManagement.clearAllFilters}
+            </button>
           )}
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.number}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.avatar}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                Account Type
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.phone}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.email}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.subscription}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.lastAccess}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.registrationDate}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.status}
-              </th>
-              <th className="px-4 py-4 text-center text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userManagement.table.actions}
-              </th>
+      <TableContainer>
+        <TableHead>
+          <Th>{t.userManagement.table.number}</Th>
+          <Th>{t.userManagement.table.avatar}</Th>
+          <Th>Account Type</Th>
+          <Th>{t.userManagement.table.phone}</Th>
+          <Th>{t.userManagement.table.email}</Th>
+          <Th>{t.userManagement.table.subscription}</Th>
+          <Th>{t.userManagement.table.lastAccess}</Th>
+          <Th>{t.userManagement.table.registrationDate}</Th>
+          <Th>{t.userManagement.table.status}</Th>
+          <Th align="center">{t.userManagement.table.actions}</Th>
+        </TableHead>
+        <TableBody>
+          {isLoading ? (
+            <tr>
+              <td colSpan={9} className="px-4 py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#71717a] text-sm">Loading...</p>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-[#27272a]">
-            {isLoading ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[#71717a] text-sm">Loading...</p>
+          ) : filteredUsers.length === 0 ? (
+            <tr>
+              <td colSpan={9} className="px-4 py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Search className="w-12 h-12 text-[#3f3f46]" />
+                  <div>
+                    <p className="text-white text-lg font-semibold mb-1">
+                      {t.userManagement.emptyState.noUsers}
+                    </p>
+                    <p className="text-[#71717a] text-sm">
+                      {t.userManagement.emptyState.tryAdjusting}
+                    </p>
                   </div>
-                </td>
-              </tr>
-            ) : filteredUsers.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <Search className="w-12 h-12 text-[#3f3f46]" />
-                    <div>
-                      <p className="text-white text-lg font-semibold mb-1">
-                        {t.userManagement.emptyState.noUsers}
-                      </p>
-                      <p className="text-[#71717a] text-sm">
-                        {t.userManagement.emptyState.tryAdjusting}
-                      </p>
-                    </div>
-                    {(searchQuery ||
-                      statusFilter !== "all" ||
-                      userTypeFilter !== "all" ||
-                      accountTypeFilter !== "all") && (
-                      <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setStatusFilter("all");
-                          setUserTypeFilter("all");
-                          setAccountTypeFilter("all");
-                        }}
-                        className="mt-2 px-4 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white text-sm rounded-lg transition-colors font-medium"
-                      >
-                        {t.userManagement.emptyState.clearFilters}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user, index) => {
-                const isGuest = user.account_type === 'guest';
-                return (
-                <tr
+                  {(searchQuery ||
+                    statusFilter !== "" ||
+                    userTypeFilter !== "all" ||
+                    accountTypeFilter !== "") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setStatusFilter("");
+                        setUserTypeFilter("all");
+                        setAccountTypeFilter("");
+                      }}
+                      className="mt-2 px-4 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white text-sm rounded-lg transition-colors font-medium"
+                    >
+                      {t.userManagement.emptyState.clearFilters}
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ) : (
+            filteredUsers.map((user, index) => {
+              const isGuest = user.account_type === 'guest';
+              return (
+                <TableRow
                   key={user.global_id}
                   onClick={() => {
                     setSelectedUser(user);
                     setShowUserDetail(true);
                   }}
-                  className="hover:bg-[rgba(255,255,255,0.03)] transition-colors cursor-pointer"
                 >
                   {/* Row Number */}
-                  <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap">
-                    {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                  </td>
+                  <Td>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</Td>
 
                   {/* Avatar with Name & Username */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
+                  <Td>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-[#27272a] flex items-center justify-center">
                         {user.profile_url ? (
@@ -540,10 +357,10 @@ const UserManagement = () => {
                         </p>
                       </div>
                     </div>
-                  </td>
+                  </Td>
 
                   {/* Account Type */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
+                  <Td>
                     {(() => {
                       const type = user.account_type ?? 'guest';
                       const config = {
@@ -552,39 +369,25 @@ const UserManagement = () => {
                       }[type];
                       return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${config.cls}`}>{config.label}</span>;
                     })()}
-                  </td>
+                  </Td>
 
                   {/* Phone Number */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm font-medium">
-                      {user.phone_number}
-                    </p>
-                  </td>
+                  <Td className="font-medium">{user.phone_number}</Td>
 
                   {/* Email */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">{user.email}</p>
-                  </td>
+                  <Td>{user.email}</Td>
 
                   {/* Subscription — placeholder */}
-                  <td className="px-4 py-3.5 whitespace-nowrap"></td>
+                  <Td>{null}</Td>
 
                   {/* Last Access */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">
-                      {formatDate(user.last_login)}
-                    </p>
-                  </td>
+                  <Td>{formatDate(user.last_login)}</Td>
 
                   {/* Registration Date */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">
-                      {formatDate(user.created_at)}
-                    </p>
-                  </td>
+                  <Td>{formatDate(user.created_at)}</Td>
 
                   {/* Status */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
+                  <Td>
                     <span
                       className={`inline-flex px-3 py-1.5 text-xs rounded-full font-medium ${
                         user.status === 1
@@ -596,13 +399,10 @@ const UserManagement = () => {
                         ? t.userManagement.filters.active
                         : t.userManagement.filters.suspended}
                     </span>
-                  </td>
+                  </Td>
 
                   {/* Actions */}
-                  <td
-                    className="px-4 py-3.5 whitespace-nowrap"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <Td align="center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1.5">
                       {/* View */}
                       <button
@@ -658,8 +458,6 @@ const UserManagement = () => {
                         )}
                       </button>
 
-                      
-
                       {/* Upgrade to Creator */}
                       {/* <button
                         className="p-2 rounded-lg hover:bg-[#27272a] transition-colors disabled:opacity-40"
@@ -680,14 +478,13 @@ const UserManagement = () => {
                         />
                       </button> */}
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </TableRow>
               );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+            })
+          )}
+        </TableBody>
+      </TableContainer>
 
       {/* Pagination */}
       <Pagination

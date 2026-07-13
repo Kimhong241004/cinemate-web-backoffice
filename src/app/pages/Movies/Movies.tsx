@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Plus, SlidersHorizontal, Eye, Edit, Trash2, X, Film, Star, Play, Clock, EyeOff } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Trash2, X, Film, Star, Play, Clock, EyeOff } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { movieService, MovieFromApi, GenreFromApi } from '../../../api/services/movieService';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import Pagination from '../../components/shared/Pagination';
+import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td } from '../../components/shared/Table/Table';
 
 const TAKE = 10;
 
@@ -67,48 +69,6 @@ const Badge = ({ label, cls }: { label: string; cls: string }) => (
   </span>
 );
 
-// ── filter dropdown ──────────────────────────────────────────────────────────
-const FilterDropdown = ({
-  label, active, open, onToggle, children,
-}: {
-  label: string; active: boolean; open: boolean;
-  onToggle: (e: React.MouseEvent) => void; children: React.ReactNode;
-}) => (
-  <div className="relative">
-    <button
-      onClick={onToggle}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-        active
-          ? 'bg-[#ef4444]/10 border-[#ef4444]/40 text-[#ef4444]'
-          : 'bg-[#18181b] border-[#27272a] text-[#a1a1aa] hover:text-white hover:border-[#3f3f46]'
-      }`}
-    >
-      <SlidersHorizontal className="w-3.5 h-3.5" />
-      <span>{label}</span>
-      {active && <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />}
-      <svg className="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
-    {open && (
-      <div className="absolute z-20 top-full mt-2 left-0 min-w-[160px] bg-[#18181b] border border-[#27272a] rounded-xl shadow-2xl overflow-hidden">
-        {children}
-      </div>
-    )}
-  </div>
-);
-
-const FilterItem = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-      active ? 'text-[#ef4444] bg-[#ef4444]/5 font-medium' : 'text-[#a1a1aa] hover:text-white hover:bg-[#27272a]'
-    }`}
-  >
-    {label}
-  </button>
-);
-
 // ── main component ───────────────────────────────────────────────────────────
 const Movies = () => {
   const navigate = useNavigate();
@@ -123,7 +83,6 @@ const Movies = () => {
   const [selectedGenre,   setSelectedGenre]   = useState('');
   const [selectedQuality, setSelectedQuality] = useState('');
   const [selectedStatus,  setSelectedStatus]  = useState('');
-  const [openFilter, setOpenFilter] = useState<string | null>(null);
 
   const [viewMovie,   setViewMovie]   = useState<MovieFromApi | null>(null);
   const [deleteMovie, setDeleteMovie] = useState<MovieFromApi | null>(null);
@@ -216,18 +175,6 @@ const Movies = () => {
     }
   };
 
-  useEffect(() => {
-    if (!openFilter) return;
-    const close = () => setOpenFilter(null);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [openFilter]);
-
-  const toggleFilter = (name: string) => (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpenFilter((prev) => (prev === name ? null : name));
-  };
-
   const typeOptions    = [{ value: 'full', label: t.movies.fullMovie }, { value: 'series', label: t.movies.series }];
   const qualityOptions = ['FHD', 'HD', '4K'];
   const statusOptions  = [
@@ -293,42 +240,40 @@ const Movies = () => {
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Type */}
-          <FilterDropdown label={t.movies.type} active={!!selectedType} open={openFilter === 'type'} onToggle={toggleFilter('type')}>
-            <FilterItem label={t.movies.allTypes} active={!selectedType} onClick={() => { setSelectedType(''); setCurrentPage(1); setOpenFilter(null); }} />
-            {typeOptions.map((o) => (
-              <FilterItem key={o.value} label={o.label} active={selectedType === o.value}
-                onClick={() => { setSelectedType(o.value); setCurrentPage(1); setOpenFilter(null); }} />
-            ))}
-          </FilterDropdown>
+          <StatusFilterDropdown
+            label={t.movies.type}
+            allLabel={t.movies.allTypes}
+            selectedValue={selectedType}
+            onSelect={(v) => { setSelectedType(v); setCurrentPage(1); }}
+            options={typeOptions}
+          />
 
           {/* Genre */}
-          <FilterDropdown label={t.movies.genreType} active={!!selectedGenre} open={openFilter === 'genre'} onToggle={toggleFilter('genre')}>
-            <div className="max-h-52 overflow-y-auto">
-              <FilterItem label={t.movies.allGenres} active={!selectedGenre} onClick={() => { setSelectedGenre(''); setCurrentPage(1); setOpenFilter(null); }} />
-              {genres.map((g) => (
-                <FilterItem key={g.global_id} label={g.name} active={selectedGenre === g.slug}
-                  onClick={() => { setSelectedGenre(g.slug); setCurrentPage(1); setOpenFilter(null); }} />
-              ))}
-            </div>
-          </FilterDropdown>
+          <StatusFilterDropdown
+            label={t.movies.genreType}
+            allLabel={t.movies.allGenres}
+            selectedValue={selectedGenre}
+            onSelect={(v) => { setSelectedGenre(v); setCurrentPage(1); }}
+            options={genres.map((g) => ({ value: g.slug, label: g.name }))}
+          />
 
           {/* Quality */}
-          <FilterDropdown label={t.movies.filmType} active={!!selectedQuality} open={openFilter === 'quality'} onToggle={toggleFilter('quality')}>
-            <FilterItem label={t.movies.allQualities} active={!selectedQuality} onClick={() => { setSelectedQuality(''); setOpenFilter(null); }} />
-            {qualityOptions.map((q) => (
-              <FilterItem key={q} label={q} active={selectedQuality === q}
-                onClick={() => { setSelectedQuality(q); setOpenFilter(null); }} />
-            ))}
-          </FilterDropdown>
+          <StatusFilterDropdown
+            label={t.movies.filmType}
+            allLabel={t.movies.allQualities}
+            selectedValue={selectedQuality}
+            onSelect={setSelectedQuality}
+            options={qualityOptions.map((q) => ({ value: q, label: q }))}
+          />
 
           {/* Status */}
-          <FilterDropdown label={t.movies.status} active={!!selectedStatus} open={openFilter === 'status'} onToggle={toggleFilter('status')}>
-            <FilterItem label={t.movies.allStatus} active={!selectedStatus} onClick={() => { setSelectedStatus(''); setCurrentPage(1); setOpenFilter(null); }} />
-            {statusOptions.map((o) => (
-              <FilterItem key={o.value} label={o.label} active={selectedStatus === o.value}
-                onClick={() => { setSelectedStatus(o.value); setCurrentPage(1); setOpenFilter(null); }} />
-            ))}
-          </FilterDropdown>
+          <StatusFilterDropdown
+            label={t.movies.status}
+            allLabel={t.movies.allStatus}
+            selectedValue={selectedStatus}
+            onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }}
+            options={statusOptions}
+          />
 
           {(selectedType || selectedGenre || selectedQuality || selectedStatus) && (
             <button
@@ -342,197 +287,182 @@ const Movies = () => {
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
-      <div className="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.number}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.image}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.columnTitle}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.language}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.quality}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.genreType}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">Rental Price</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">Total Revenue</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">Access Type</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.status}</th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">Upload Status</th>
-              <th className="px-4 py-4 text-center text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">{t.movies.actions}</th>
+      <TableContainer>
+        <TableHead>
+          <Th>{t.movies.number}</Th>
+          <Th>{t.movies.image}</Th>
+          <Th>{t.movies.columnTitle}</Th>
+          <Th>{t.movies.language}</Th>
+          <Th>{t.movies.genreType}</Th>
+          <Th>{t.movies.quality}</Th>
+          <Th>Rental Price</Th>
+          <Th>Total Revenue</Th>
+          <Th>Access Type</Th>
+          <Th>{t.movies.status}</Th>
+          <Th>Upload Status</Th>
+          <Th align="center">{t.movies.actions}</Th>
+        </TableHead>
+
+        <TableBody>
+          {isLoading ? (
+            <tr>
+              <td colSpan={12} className="px-4 py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#71717a] text-sm">Loading...</p>
+                </div>
+              </td>
             </tr>
-          </thead>
+          ) : displayedMovies.length === 0 ? (
+            <tr>
+              <td colSpan={12} className="px-4 py-12 text-center">
+                <Film className="w-10 h-10 text-[#3f3f46] mx-auto mb-3" />
+                <p className="text-[#71717a] text-sm">{t.movies.noMoviesFound}</p>
+              </td>
+            </tr>
+          ) : (
+            displayedMovies.map((movie, index) => {
+              const ql         = qualityLabel(movie.video_quality);
+              const src0       = movie.sources?.[0];
+              const vidStatus  = src0 ? videoStatusConfig[src0.upload_status] : null;
+              const accessType = movie.movie_type?.toLowerCase() ?? 'free';
 
-          <tbody className="divide-y divide-[#27272a]">
-            {isLoading ? (
-              <tr>
-                <td colSpan={12} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[#71717a] text-sm">Loading...</p>
-                  </div>
-                </td>
-              </tr>
-            ) : displayedMovies.length === 0 ? (
-              <tr>
-                <td colSpan={12} className="px-4 py-12 text-center">
-                  <Film className="w-10 h-10 text-[#3f3f46] mx-auto mb-3" />
-                  <p className="text-[#71717a] text-sm">{t.movies.noMoviesFound}</p>
-                </td>
-              </tr>
-            ) : (
-              displayedMovies.map((movie, index) => {
-                const ql         = qualityLabel(movie.video_quality);
-                const src0       = movie.sources?.[0];
-                const vidStatus  = src0 ? videoStatusConfig[src0.upload_status] : null;
-                const accessType = movie.movie_type?.toLowerCase() ?? 'free';
+              return (
+                <TableRow key={movie.global_id}>
 
-                return (
-                  <tr key={movie.global_id} className="hover:bg-[rgba(255,255,255,0.03)] transition-colors">
+                  {/* # */}
+                  <Td>{(currentPage - 1) * TAKE + index + 1}</Td>
 
-                    {/* # */}
-                    <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap">
-                      {(currentPage - 1) * TAKE + index + 1}
-                    </td>
-
-                    {/* Images */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-9 h-12 rounded-md overflow-hidden bg-[#27272a] flex-shrink-0">
-                          {movie.poster_url
-                            ? <img src={movie.poster_url} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center"><Film className="w-3.5 h-3.5 text-[#52525b]" /></div>
-                          }
-                        </div>
-                        <div className="w-16 h-12 rounded-md overflow-hidden bg-[#27272a] flex-shrink-0">
-                          {movie.cover_url
-                            ? <img src={movie.cover_url} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center"><Film className="w-3.5 h-3.5 text-[#52525b]" /></div>
-                          }
-                        </div>
+                  {/* Images */}
+                  <Td>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-9 h-12 rounded-md overflow-hidden bg-[#27272a] flex-shrink-0">
+                        {movie.poster_url
+                          ? <img src={movie.poster_url} alt="" className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center"><Film className="w-3.5 h-3.5 text-[#52525b]" /></div>
+                        }
                       </div>
-                    </td>
+                      <div className="w-16 h-12 rounded-md overflow-hidden bg-[#27272a] flex-shrink-0">
+                        {movie.cover_url
+                          ? <img src={movie.cover_url} alt="" className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center"><Film className="w-3.5 h-3.5 text-[#52525b]" /></div>
+                        }
+                      </div>
+                    </div>
+                  </Td>
 
-                    {/* Title */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
+                  {/* Title */}
+                  <Td>
+                    <div className="max-w-[220px] whitespace-normal">
                       <p className="text-white text-sm font-semibold flex items-center gap-1.5">
-                        {movie.title}
-                        {movie.is_highlight && <Star className="w-3.5 h-3.5 fill-[#eab308] text-[#eab308]" />}
+                        <span className="line-clamp-2">{movie.title}</span>
+                        {movie.is_highlight && <Star className="w-3.5 h-3.5 flex-shrink-0 fill-[#eab308] text-[#eab308]" />}
                       </p>
                       <p className="text-[#71717a] text-xs mt-0.5">{movie.release_date || '—'}</p>
                       <p className="text-[#52525b] text-xs mt-0.5">{movie.total_views.toLocaleString()} {t.movies.viewers}</p>
-                    </td>
+                    </div>
+                  </Td>
 
-                    {/* Language */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="text-white text-sm">{movie.language}</p>
-                      <p className="text-[#71717a] text-xs mt-0.5">{formatDuration(movie.duration)}</p>
-                    </td>
+                  {/* Language */}
+                  <Td>
+                    <p className="text-white text-sm">{movie.language}</p>
+                    <p className="text-[#71717a] text-xs mt-0.5">{formatDuration(movie.duration)}</p>
+                  </Td>
 
-                    {/* Quality */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <Badge label={ql} cls={qualityColors[ql] ?? qualityColors['HD']} />
-                    </td>
+                  {/* Genre */}
+                  <Td>
+                    <div className="flex flex-wrap gap-1 max-w-[160px]">
+                      {movie.genres.length > 0
+                        ? movie.genres.map((g) => (
+                            <Badge key={g.global_id} label={g.name} cls="bg-[#27272a] text-[#a1a1aa]" />
+                          ))
+                        : <span className="text-[#52525b] text-sm">—</span>
+                      }
+                    </div>
+                  </Td>
 
-                    {/* Genre */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-1">
-                        {movie.genres.length > 0
-                          ? movie.genres.slice(0, 2).map((g) => (
-                              <span key={g.id} className="inline-flex px-2.5 py-1 rounded-full bg-[#27272a] text-xs text-[#a1a1aa]">
-                                {g.name}
-                              </span>
-                            ))
-                          : <span className="text-xs text-[#52525b]">—</span>
-                        }
-                        {movie.genres.length > 2 && (
-                          <span className="inline-flex px-2.5 py-1 rounded-full bg-[#27272a] text-xs text-[#52525b]">
-                            +{movie.genres.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    </td>
+                  {/* Quality */}
+                  <Td>
+                    <Badge label={ql} cls={qualityColors[ql] ?? qualityColors['HD']} />
+                  </Td>
 
-                    {/* Rental Price */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="text-white text-sm font-medium">{movie.base_price.toLocaleString()} ៛</p>
-                    </td>
+                  {/* Rental Price */}
+                  <Td className="font-medium">{movie.base_price.toLocaleString()} ៛</Td>
 
-                    {/* Total Revenue */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className={`text-sm font-medium ${movie.total_revenue > 0 ? 'text-[#22c55e]' : 'text-[#71717a]'}`}>
-                        {movie.total_revenue.toLocaleString()} ៛
-                      </p>
-                    </td>
+                  {/* Total Revenue */}
+                  <Td className={`font-medium ${movie.total_revenue > 0 ? 'text-[#22c55e]' : 'text-[#71717a]'}`}>
+                    {movie.total_revenue.toLocaleString()} ៛
+                  </Td>
 
-                    {/* Access Type */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <Badge
-                        label={accessType.charAt(0).toUpperCase() + accessType.slice(1)}
-                        cls={accessTypeColors[accessType] ?? accessTypeColors['free']}
-                      />
-                    </td>
+                  {/* Access Type */}
+                  <Td>
+                    <Badge
+                      label={accessType.charAt(0).toUpperCase() + accessType.slice(1)}
+                      cls={accessTypeColors[accessType] ?? accessTypeColors['free']}
+                    />
+                  </Td>
 
-                    {/* Status */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <Badge
-                        label={movie.movie_status === 'published' ? t.movies.publish : movie.movie_status === 'draft' ? t.movies.draft : t.movies.unpublished}
-                        cls={statusStyles[movie.movie_status] ?? statusStyles['unpublished']}
-                      />
-                    </td>
+                  {/* Status */}
+                  <Td>
+                    <Badge
+                      label={movie.movie_status === 'published' ? t.movies.publish : movie.movie_status === 'draft' ? t.movies.draft : t.movies.unpublished}
+                      cls={statusStyles[movie.movie_status] ?? statusStyles['unpublished']}
+                    />
+                  </Td>
 
-                    {/* Video */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      {progressByRow[(currentPage - 1) * TAKE + index] !== undefined ? (() => {
-                        const { phase, pct } = progressByRow[(currentPage - 1) * TAKE + index];
-                        const c = phaseConfig[phase];
-                        return (
-                          <div className="w-32">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className={`${c.text} text-xs font-medium`}>{c.label}</span>
-                              <span className={`${c.text} text-xs font-semibold`}>{pct}%</span>
-                            </div>
-                            <div className={`w-full h-2 ${c.track} rounded-full overflow-hidden`}>
-                              <div className={`h-full ${c.bar} rounded-full`} style={{ width: `${pct}%` }} />
-                            </div>
+                  {/* Video */}
+                  <Td>
+                    {progressByRow[(currentPage - 1) * TAKE + index] !== undefined ? (() => {
+                      const { phase, pct } = progressByRow[(currentPage - 1) * TAKE + index];
+                      const c = phaseConfig[phase];
+                      return (
+                        <div className="w-32">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`${c.text} text-xs font-medium`}>{c.label}</span>
+                            <span className={`${c.text} text-xs font-semibold`}>{pct}%</span>
                           </div>
-                        );
-                      })() : vidStatus ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                          <span className={`w-1.5 h-1.5 rounded-full ${vidStatus.dot}`} />
-                          <span className="text-[#a1a1aa]">{vidStatus.label}</span>
-                        </span>
-                      ) : (
-                        <span className="text-[#52525b] text-sm">—</span>
-                      )}
-                    </td>
+                          <div className={`w-full h-2 ${c.track} rounded-full overflow-hidden`}>
+                            <div className={`h-full ${c.bar} rounded-full`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })() : vidStatus ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                        <span className={`w-1.5 h-1.5 rounded-full ${vidStatus.dot}`} />
+                        <span className="text-[#a1a1aa]">{vidStatus.label}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[#52525b] text-sm">—</span>
+                    )}
+                  </Td>
 
-                    {/* Actions */}
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setViewMovie(movie)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="View">
-                          <Eye className="w-4 h-4 text-[#f97316]" />
-                        </button>
-                        <button
-                          className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                          title={movie.is_highlight ? 'Highlighted' : 'Highlight'}
-                        >
-                          <Star className={`w-4 h-4 ${movie.is_highlight ? 'fill-[#eab308] text-[#eab308]' : 'text-[#52525b]'}`} />
-                        </button>
-                        <button onClick={() => navigate(`/movies/edit/${movie.global_id}`)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Edit">
-                          <Edit className="w-4 h-4 text-[#3b82f6]" />
-                        </button>
-                        <button onClick={() => setDeleteMovie(movie)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Delete">
-                          <Trash2 className="w-4 h-4 text-[#ef4444]" />
-                        </button>
-                      </div>
-                    </td>
+                  {/* Actions */}
+                  <Td align="center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setViewMovie(movie)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="View">
+                        <Eye className="w-4 h-4 text-[#6C5CE7]" />
+                      </button>
+                      <button
+                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                        title={movie.is_highlight ? 'Highlighted' : 'Highlight'}
+                      >
+                        <Star className={`w-4 h-4 ${movie.is_highlight ? 'fill-[#eab308] text-[#eab308]' : 'text-[#52525b]'}`} />
+                      </button>
+                      <button onClick={() => navigate(`/movies/edit/${movie.global_id}`)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Edit">
+                        <Edit className="w-4 h-4 text-[#3b82f6]" />
+                      </button>
+                      <button onClick={() => setDeleteMovie(movie)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Delete">
+                        <Trash2 className="w-4 h-4 text-[#ef4444]" />
+                      </button>
+                    </div>
+                  </Td>
 
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </TableContainer>
 
       {/* ── Pagination ──────────────────────────────────────────────────── */}
       <Pagination

@@ -1,11 +1,13 @@
 import { apiClient } from "../clients/apiClient";
 
+export type PromoCodeType = "movie" | "subscription" | "product";
+
 export interface PromoCodeFromApi {
   id: number;
   global_id: string;
   code: string;
   description: string;
-  promo_code_type: "movie" | "subscription" | "series" | "season" | "episode";
+  promo_code_type: PromoCodeType;
   discount_amount: number;
   discount_type: "percentage" | "amount";
   expires_at: string;
@@ -28,7 +30,7 @@ export interface GetPromoCodesResponse {
 export interface CreatePromoCodePayload {
   code: string;
   description?: string;
-  promo_code_type: "movie" | "subscription" | "series" | "season" | "episode";
+  promo_code_type: PromoCodeType;
   discount_amount: number;
   discount_type: "percentage" | "amount";
   expires_at: string;
@@ -39,7 +41,7 @@ export interface CreatePromoCodePayload {
 export interface UpdatePromoCodePayload {
   code?: string;
   description?: string;
-  promo_code_type?: "movie" | "subscription" | "series" | "season" | "episode";
+  promo_code_type?: PromoCodeType;
   discount_amount?: number;
   discount_type?: "percentage" | "amount";
   expires_at?: string;

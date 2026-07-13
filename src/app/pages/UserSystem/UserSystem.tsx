@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Pagination from "../../components/shared/Pagination";
-import StatusFilterDropdown from "../../components/shared/StatusFilterDropdown";
+import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
 import {
   Plus,
   Edit,
@@ -24,6 +24,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { adminService, AdminFromApi } from "../../../api/services/adminService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import ImageUploader from "../../components/shared/ImageUploader";
+import { TableContainer, TableHead, Th, TableBody, TableRow, Td } from "../../components/shared/Table/Table";
 
 interface SystemUser {
   id: number;
@@ -387,133 +388,104 @@ const UserSystem = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-[#18181b] rounded-2xl border border-[#27272a] overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[#27272a] bg-[#0a0a0a]">
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.number}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.profileImage}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.email}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                Username
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                Role
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.joinDate}
-              </th>
-              <th className="px-4 py-4 text-left text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.status}
-              </th>
-              <th className="px-4 py-4 text-center text-[#71717a] text-xs font-bold uppercase tracking-wider whitespace-nowrap">
-                {t.userSystem.actions}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#27272a]">
-            {isLoading ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
-                    <p className="text-[#71717a] text-sm">
-                      {t.userSystem.loading || "Loading..."}
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            ) : filteredUsers.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center">
-                  <User className="w-12 h-12 text-[#71717a] mx-auto mb-3" />
-                  <p className="text-white text-sm font-medium">
-                    {t.userSystem.noFound}
+      <TableContainer>
+        <TableHead>
+          <Th>{t.userSystem.number}</Th>
+          <Th>{t.userSystem.profileImage}</Th>
+          <Th>{t.userSystem.email}</Th>
+          <Th>Username</Th>
+          <Th>Role</Th>
+          <Th>{t.userSystem.joinDate}</Th>
+          <Th>{t.userSystem.status}</Th>
+          <Th align="center">{t.userSystem.actions}</Th>
+        </TableHead>
+        <TableBody>
+          {isLoading ? (
+            <tr>
+              <td colSpan={8} className="px-4 py-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#71717a] text-sm">
+                    {t.userSystem.loading || "Loading..."}
                   </p>
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user, index) => (
-                <tr
-                  key={user.global_id}
-                  className="hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                >
-                  <td className="px-4 py-3.5 text-white text-sm whitespace-nowrap">
-                    {(currentPage - 1) * itemsPerPage + index + 1}
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-[#27272a] flex items-center justify-center">
-                      {user.profile_url ? (
-                        <img
-                          src={user.profile_url}
-                          alt={user.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-[#3f3f46]">
-                          <User className="w-5 h-5 text-[#71717a]" />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">{user.email}</p>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">{user.username}</p>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span className="inline-flex px-3 py-1 text-xs rounded-full border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20">
-                      {user.role || "Admin"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <p className="text-white text-sm">
-                      {new Date(user.last_login).toLocaleDateString()}
-                    </p>
-                    <p className="text-[#71717a] text-xs">
-                      {new Date(user.last_login).toLocaleTimeString()}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <StatusBadge status={user.status} />
-                  </td>
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Edit className="w-4 h-4 text-[#6C5CE7]" />
-                      </button>
-                      <button
-                        onClick={() => handleBanUser(user)}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Ban
-                          className={`w-4 h-4 ${user.status === 1 ? "text-[#f59e0b]" : "text-[#22c55e]"}`}
-                        />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user)}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-[#ef4444]" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </td>
+            </tr>
+          ) : filteredUsers.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="px-4 py-12 text-center">
+                <User className="w-12 h-12 text-[#71717a] mx-auto mb-3" />
+                <p className="text-white text-sm font-medium">
+                  {t.userSystem.noFound}
+                </p>
+              </td>
+            </tr>
+          ) : (
+            filteredUsers.map((user, index) => (
+              <TableRow key={user.global_id}>
+                <Td>{(currentPage - 1) * itemsPerPage + index + 1}</Td>
+                <Td>
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-[#27272a] flex items-center justify-center">
+                    {user.profile_url ? (
+                      <img
+                        src={user.profile_url}
+                        alt={user.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-[#3f3f46]">
+                        <User className="w-5 h-5 text-[#71717a]" />
+                      </div>
+                    )}
+                  </div>
+                </Td>
+                <Td>{user.email}</Td>
+                <Td>{user.username}</Td>
+                <Td>
+                  <span className="inline-flex px-3 py-1 text-xs rounded-full border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20">
+                    {user.role || "Admin"}
+                  </span>
+                </Td>
+                <Td>
+                  <p className="text-white text-sm">
+                    {new Date(user.last_login).toLocaleDateString()}
+                  </p>
+                  <p className="text-[#71717a] text-xs">
+                    {new Date(user.last_login).toLocaleTimeString()}
+                  </p>
+                </Td>
+                <Td>
+                  <StatusBadge status={user.status} />
+                </Td>
+                <Td align="center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() => handleEditUser(user)}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Edit className="w-4 h-4 text-[#6C5CE7]" />
+                    </button>
+                    <button
+                      onClick={() => handleBanUser(user)}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Ban
+                        className={`w-4 h-4 ${user.status === 1 ? "text-[#f59e0b]" : "text-[#22c55e]"}`}
+                      />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user)}
+                      className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-[#ef4444]" />
+                    </button>
+                  </div>
+                </Td>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </TableContainer>
 
       {/* Pagination */}
       <Pagination
@@ -710,7 +682,7 @@ const UserSystem = () => {
           banUser?.status === 1 ? t.userSystem.yesBan : t.userSystem.yesUnban
         }
         cancelLabel={t.userSystem.cancel}
-        variant={banUser?.status === 1 ? "warning" : "info"}
+        variant={banUser?.status === 1 ? "danger" : "info"}
         loading={isSaving}
         onConfirm={handleBanConfirm}
         onCancel={() => setBanUser(null)}
