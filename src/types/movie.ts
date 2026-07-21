@@ -79,7 +79,7 @@ export interface MovieFormProps {
   submittingLabel: string;
   isSubmitting: boolean;
   initialValues?: Partial<MovieFormValues>;
-  initialPreviews?: { poster?: string; cover?: string };
+  initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
   onCancel: () => void;
   onSubmit: (values: MovieFormValues, files: MovieFormFiles) => void;
   showToast: (message: string, type: 'success' | 'error') => void;

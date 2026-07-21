@@ -6,8 +6,6 @@ import DateInput, { type DateRangeValue } from "../shared/DateInput";
 export interface PromoCodeFormData {
   code: string;
   quantity: string;
-  prefix: string;
-  suffix: string;
   description: string;
   promoCodeType: string[];
   discountType: "percentage" | "amount";
@@ -82,30 +80,38 @@ const PromoCodeFormModal = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 bg-[#0a0a0a] p-1 rounded-lg mb-6">
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, visibility: "public" })}
-            className={`py-2 rounded-md text-sm font-medium transition-colors ${
-              formData.visibility === "public"
-                ? "bg-[#27272a] text-white"
-                : "text-[#71717a] hover:text-white"
-            }`}
-          >
-            Public
-          </button>
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, visibility: "private" })}
-            className={`py-2 rounded-md text-sm font-medium transition-colors ${
-              formData.visibility === "private"
-                ? "bg-[#27272a] text-white"
-                : "text-[#71717a] hover:text-white"
-            }`}
-          >
-            Private
-          </button>
-        </div>
+        {isEditing ? (
+          <div className="bg-[#0a0a0a] p-1 rounded-lg mb-6">
+            <div className="py-2 rounded-md text-sm font-medium text-center bg-[#27272a] text-white">
+              {formData.visibility === "private" ? "Private" : "Public"}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 bg-[#0a0a0a] p-1 rounded-lg mb-6">
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, visibility: "public" })}
+              className={`py-2 rounded-md text-sm font-medium transition-colors ${
+                formData.visibility === "public"
+                  ? "bg-[#27272a] text-white"
+                  : "text-[#71717a] hover:text-white"
+              }`}
+            >
+              Public
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, visibility: "private" })}
+              className={`py-2 rounded-md text-sm font-medium transition-colors ${
+                formData.visibility === "private"
+                  ? "bg-[#27272a] text-white"
+                  : "text-[#71717a] hover:text-white"
+              }`}
+            >
+              Private
+            </button>
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* Code / Quantity */}
@@ -135,67 +141,27 @@ const PromoCodeFormModal = ({
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Quantity *
-                </label>
-                <input
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, quantity: e.target.value })
-                  }
-                  className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
-                    formErrors.quantity
-                      ? "border-[#ef4444]"
-                      : "border-[#27272a]"
-                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-                  placeholder="10"
-                  min="1"
-                />
-                {formErrors.quantity && (
-                  <p className="text-[#ef4444] text-xs mt-1">
-                    {formErrors.quantity}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Prefix
-                </label>
-                <input
-                  type="text"
-                  value={formData.prefix}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      prefix: e.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm font-mono"
-                  placeholder="WELCOME"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white text-sm font-medium mb-2">
-                  Suffix
-                </label>
-                <input
-                  type="text"
-                  value={formData.suffix}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      suffix: e.target.value.toUpperCase(),
-                    })
-                  }
-                  className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm font-mono"
-                  placeholder="2024"
-                />
-              </div>
+            <div>
+              <label className="block text-white text-sm font-medium mb-2">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                value={formData.quantity}
+                onChange={(e) =>
+                  setFormData({ ...formData, quantity: e.target.value })
+                }
+                className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
+                  formErrors.quantity ? "border-[#ef4444]" : "border-[#27272a]"
+                } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
+                placeholder="10"
+                min="1"
+              />
+              {formErrors.quantity && (
+                <p className="text-[#ef4444] text-xs mt-1">
+                  {formErrors.quantity}
+                </p>
+              )}
             </div>
           )}
 
@@ -220,8 +186,8 @@ const PromoCodeFormModal = ({
             <label className="block text-white text-sm font-medium mb-2">
               Promo Code Type *
             </label>
-            <div className="grid grid-cols-3 gap-3">
-              {(["movie", "subscription", "product"] as const).map((type) => (
+            <div className="grid grid-cols-2 gap-3">
+              {(["movie", "subscription"] as const).map((type) => (
                 <button
                   key={type}
                   type="button"

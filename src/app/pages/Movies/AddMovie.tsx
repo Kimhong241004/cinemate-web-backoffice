@@ -18,6 +18,13 @@ const AddMovie = () => {
   const handleSubmit = async (values: MovieFormValues, files: MovieFormFiles) => {
     setIsSubmitting(true);
     try {
+      // Trailer/video must be uploaded (chunked, direct-to-storage) before the
+      // movie is created — the movie payload references them by upload_global_id.
+      const [trailerUploadId, movieUploadId] = await Promise.all([
+        files.trailer ? movieService.uploadFileInChunks('trailer', files.trailer) : Promise.resolve(undefined),
+        files.video ? movieService.uploadFileInChunks('movie', files.video) : Promise.resolve(undefined),
+      ]);
+
       const created = await movieService.createMovie({
         content_type: values.uploadType === 'series' ? 'series' : 'movie',
         title: values.title,
@@ -33,14 +40,16 @@ const AddMovie = () => {
         status: 1,
         author_ids: [],
         genre_ids: [],
+        upload_id: movieUploadId,
+        trailer_upload_id: trailerUploadId,
       });
 
-      await movieService.uploadFiles(created.global_id, {
-        poster_file: files.poster ?? undefined,
-        cover_file: files.cover ?? undefined,
-        trailer_file: files.trailer ?? undefined,
-        movie_file: files.video ?? undefined,
-      });
+      if (files.poster || files.cover) {
+        await movieService.uploadMedia(created.global_id, {
+          poster_file: files.poster ?? undefined,
+          cover_file: files.cover ?? undefined,
+        });
+      }
 
       showToast('Movie created successfully!', 'success');
       navigate('/movies');

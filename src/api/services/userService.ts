@@ -7,7 +7,7 @@ export interface UserFromApi {
   email: string;
   phone_number: string | null;
   profile_url: string | null;
-  user_type: 'regular' | 'creator';
+  user_type: 'regular' | 'creator' | 'guest';
   follower_count: number;
   following_count: number;
   post_count: number;
@@ -20,21 +20,26 @@ export interface UserFromApi {
 
 export interface GetUsersResponse {
   data: UserFromApi[];
-  total?: number;
-  page?: number;
-  take?: number;
+  meta: {
+    total: number;
+    page: number;
+    take: number;
+    total_pages: number;
+  };
 }
 
 export interface GetUsersParams {
   page?: number;
   take?: number;
   search?: string;
-  user_type?: string;
+  user_type?: 'regular' | 'creator';
 }
 
 export const userService = {
+  // Omitting user_type returns all account types, including guests.
   getUsers: (params?: GetUsersParams) => {
-    const query: Record<string, string> = { user_type: 'regular' };
+    const query: Record<string, string> = {};
+    if (params?.user_type) query.user_type = params.user_type;
     if (params?.page !== undefined) query.page = String(params.page);
     if (params?.take !== undefined) query.take = String(params.take);
     if (params?.search) query.search = params.search;

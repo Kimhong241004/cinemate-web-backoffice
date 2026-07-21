@@ -460,14 +460,14 @@ const Author = () => {
                 </div>
                 <div>
                   <p className="text-[#71717a] text-xs mb-1">{t.author.status}</p>
-                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${viewAuthor.status === "active" ? "bg-[#22c55e] text-white" : "bg-[#71717a] text-white"}`}>
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${viewAuthor.status === "active" ? "bg-[#22c55e]/20 text-[#22c55e]" : "bg-[#71717a]/20 text-[#71717a]"}`}>
                     {viewAuthor.status === "active" ? t.author.active : t.author.inactive}
                   </span>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#27272a]">
                 <button onClick={() => setViewAuthor(null)} className="px-4 py-2 rounded-lg bg-[#27272a] text-white text-sm hover:bg-[#3f3f46] transition-colors">{t.author.cancel}</button>
-                <button onClick={() => { handleOpenModal(viewAuthor); setViewAuthor(null); }} className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-medium hover:opacity-90 transition-opacity">{t.author.editAuthor}</button>
+                <button onClick={() => { handleOpenModal(viewAuthor); setViewAuthor(null); }} className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-medium hover:opacity-90 transition-opacity">{t.author.editAuthor}</button>
               </div>
             </div>
           </div>
