@@ -451,7 +451,7 @@ export const km = {
     searchPlaceholder: '',
     totalRooms: '',
     activeRooms: '',
-    finishedToday: '',
+    deletedToday: 'បានលុបថ្ងៃនេះ',
     totalPArticipants: '',
     table: {
       no: '',
@@ -469,7 +469,7 @@ export const km = {
     statuss: {
       active: '',
       inactive: '',
-      finished: '',
+      deleted: 'បានលុប',
     },
     modal: {
       title: '',
@@ -523,6 +523,10 @@ export const km = {
     user: 'អ្នកប្រើ',
     close: 'បិទ',
     allStatus: 'ស្ថានភាពទាំងអស់',
+    allTypes: 'ប្រភេទទាំងអស់',
+    typePlan: 'កញ្ចប់',
+    typeMovie: 'ភាពយន្ត',
+    typeTopup: 'បញ្ចូលទឹកប្រាក់',
     exportingMsg: 'កំពុងនាំចេញប្រតិបត្តិការ...',
     retryInitiated: 'ការព្យាយាមម្ដងទៀតបានចាប់ផ្ដើម',
     confirmedSuccess: 'បញ្ជាក់ដោយជោគជ័យ',
@@ -585,7 +589,6 @@ export const km = {
     promoType: 'ប្រភេទប្រូម៉ូ',
     typeMovie: 'ភាពយន្ត',
     typeSubscription: 'ការជាវ',
-    typeProduct: 'ផលិតផល',
     filterStatus: 'ច្រោះតាមស្ថានភាព',
     showing: 'បង្ហាញ',
     to: 'ដល់',

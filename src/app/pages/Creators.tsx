@@ -80,7 +80,7 @@ const Creators = () => {
           avatar: c.profile_url || '',
         }))
       );
-      setTotal(res.total ?? res.data.length);
+      setTotal(res.meta.total);
     } catch {
       showToast('Failed to load creators', 'error');
     } finally {

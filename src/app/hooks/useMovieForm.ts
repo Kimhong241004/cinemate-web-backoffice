@@ -4,7 +4,7 @@ import { Episode, MovieFormFiles, MovieFormValues, Season, SliderImage } from '.
 
 interface UseMovieFormOptions {
   initialValues?: Partial<MovieFormValues>;
-  initialPreviews?: { poster?: string; cover?: string };
+  initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
   showToast: (message: string, type: 'success' | 'error') => void;
   onSubmit: (values: MovieFormValues, files: MovieFormFiles) => void;
 }
@@ -27,8 +27,8 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
   const [previews, setPreviews] = useState({
     poster: initialPreviews?.poster ?? '',
     cover: initialPreviews?.cover ?? '',
-    trailer: '',
-    video: '',
+    trailer: initialPreviews?.trailer ?? '',
+    video: initialPreviews?.video ?? '',
   });
 
   const [seasons, setSeasons] = useState<Season[]>([]);

@@ -61,6 +61,7 @@ const videoStatusConfig: Record<string, { dot: string; label: string }> = {
   completed:  { dot: 'bg-[#22c55e]', label: 'Completed'  },
   failed:     { dot: 'bg-[#ef4444]', label: 'Failed'     },
   processing: { dot: 'bg-[#eab308]', label: 'Processing' },
+  pending:    { dot: 'bg-[#71717a]', label: 'Pending'     },
 };
 
 const Badge = ({ label, cls }: { label: string; cls: string }) => (
@@ -324,7 +325,7 @@ const Movies = () => {
             displayedMovies.map((movie, index) => {
               const ql         = qualityLabel(movie.video_quality);
               const src0       = movie.sources?.[0];
-              const vidStatus  = src0 ? videoStatusConfig[src0.upload_status] : null;
+              const vidStatus  = src0 ? videoStatusConfig[src0.convert_status] : null;
               const accessType = movie.movie_type?.toLowerCase() ?? 'free';
 
               return (

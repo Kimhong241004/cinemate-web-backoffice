@@ -136,3 +136,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Stray Windows shell redirect artifact (e.g. `cmd > nul` run outside cmd.exe)
+nul
+
+# Temp files
+*_tmp.json
+*.tmp.json

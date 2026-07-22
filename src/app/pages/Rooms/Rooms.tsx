@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
-import { Users2, Film, X, Eye, Search, MoreHorizontal, StopCircle, Ban } from 'lucide-react';
+import { Users2, Film, X, Eye, Search, MoreHorizontal, Ban, CheckCircle } from 'lucide-react';
 import Pagination from '../../components/shared/Pagination';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
 import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from '../../components/shared/Table/Table';
-import { roomService, type RoomFromApi, type RoomStatus } from '../../../api/services/roomService';
+import { roomService, type RoomFromApi, type RoomStatus, type RoomDetail } from '../../../api/services/roomService';
 
 const ITEMS_PER_PAGE = 10;
 
 const statusConfig: Record<RoomStatus, { label: string; color: string }> = {
   active:   { label: 'Active',   color: 'bg-green-500/10 text-green-500 border border-green-500/20' },
   inactive: { label: 'Inactive', color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' },
-  finished: { label: 'Finished', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  deleted: { label: 'Deleted', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
 };
 
 const UNKNOWN_STATUS = { label: 'Unknown', color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' };
 const getStatusConfig = (status: RoomStatus) => statusConfig[status] ?? UNKNOWN_STATUS;
+
+const formatPrice = (n: number) => `${new Intl.NumberFormat('en-US').format(n)} ៛`;
 
 export default function Rooms() {
   const { t } = useLanguage();
@@ -29,10 +31,12 @@ export default function Rooms() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<RoomFromApi | null>(null);
+  const [roomDetail, setRoomDetail] = useState<RoomDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [modalTab, setModalTab] = useState<'info' | 'contents' | 'participants'>('info');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [endRoomTarget, setEndRoomTarget] = useState<RoomFromApi | null>(null);
   const [disableRoomTarget, setDisableRoomTarget] = useState<RoomFromApi | null>(null);
+  const [activateRoomTarget, setActivateRoomTarget] = useState<RoomFromApi | null>(null);
   const [isActioning, setIsActioning] = useState(false);
 
   useEffect(() => {
@@ -47,7 +51,6 @@ export default function Rooms() {
       const res = await roomService.getRooms({
         skip: (currentPage - 1) * ITEMS_PER_PAGE,
         take: ITEMS_PER_PAGE,
-        search: search || undefined,
         room_status: statusFilter || undefined,
       });
       setRooms(res.data);
@@ -62,24 +65,30 @@ export default function Rooms() {
   useEffect(() => {
     fetchRooms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, search, statusFilter]);
+  }, [currentPage, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedRoom) {
+      setRoomDetail(null);
+      return;
+    }
+    setIsLoadingDetail(true);
+    roomService.getRoom(selectedRoom.global_id)
+      .then(setRoomDetail)
+      .catch(() => showToast('Failed to load room details', 'error'))
+      .finally(() => setIsLoadingDetail(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoom]);
+
+  // GET /v1/rooms doesn't document a search param, so filter by room name/ID
+  // client-side — this only narrows the rooms already fetched for the current page.
+  const filteredRooms = rooms.filter((room) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return room.room_name.toLowerCase().includes(q) || room.global_id.toLowerCase().includes(q);
+  });
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-
-  const handleEndRoom = async () => {
-    if (!endRoomTarget) return;
-    setIsActioning(true);
-    try {
-      await roomService.endRoom(endRoomTarget.global_id);
-      showToast('Room ended', 'success');
-      setEndRoomTarget(null);
-      fetchRooms();
-    } catch {
-      showToast('Failed to end room', 'error');
-    } finally {
-      setIsActioning(false);
-    }
-  };
 
   const handleDisableRoom = async () => {
     if (!disableRoomTarget) return;
@@ -91,6 +100,21 @@ export default function Rooms() {
       fetchRooms();
     } catch {
       showToast('Failed to disable room', 'error');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleActivateRoom = async () => {
+    if (!activateRoomTarget) return;
+    setIsActioning(true);
+    try {
+      await roomService.activateRoom(activateRoomTarget.global_id);
+      showToast('Room activated', 'success');
+      setActivateRoomTarget(null);
+      fetchRooms();
+    } catch {
+      showToast('Failed to activate room', 'error');
     } finally {
       setIsActioning(false);
     }
@@ -109,7 +133,7 @@ export default function Rooms() {
         {[
           { label: t.rooms.totalRooms,        value: total,                                                  icon: Users2, color: 'text-[#3b82f6]' },
           { label: t.rooms.activeNow,         value: rooms.filter(r => r.room_status === 'active').length,   icon: Film,   color: 'text-[#22c55e]' },
-          { label: t.rooms.finishedToday,     value: rooms.filter(r => r.room_status === 'finished').length, icon: Film,   color: 'text-[#f59e0b]' },
+          { label: t.rooms.deletedToday,      value: rooms.filter(r => r.room_status === 'deleted').length,  icon: Film,   color: 'text-[#f59e0b]' },
           { label: t.rooms.totalParticipants, value: rooms.reduce((sum, r) => sum + r.current_participants, 0), icon: Users2, color: 'text-[#a855f7]' },
         ].map((stat, i) => (
           <div key={i} className="bg-[#18181b] border border-[#27272a] rounded-2xl p-4">
@@ -140,7 +164,7 @@ export default function Rooms() {
           options={[
             { value: 'active', label: t.rooms.status.active },
             { value: 'inactive', label: t.rooms.status.inactive },
-            { value: 'finished', label: t.rooms.status.finished },
+            { value: 'deleted', label: t.rooms.status.deleted },
           ]}
         />
       </div>
@@ -154,22 +178,21 @@ export default function Rooms() {
           <Th>{t.rooms.table.host}</Th>
           <Th>{t.rooms.table.participants}</Th>
           <Th>{t.rooms.table.createdAt}</Th>
-          <Th>{t.rooms.table.watchedAt}</Th>
           <Th>{t.rooms.table.status}</Th>
           <Th>{t.rooms.table.actions}</Th>
         </TableHead>
         <TableBody>
           {isLoading ? (
-            <TableMessageRow colSpan={9}>{t.common.loading ?? 'Loading...'}</TableMessageRow>
-          ) : rooms.length === 0 ? (
-            <TableMessageRow colSpan={9}>{t.common.noData}</TableMessageRow>
+            <TableMessageRow colSpan={8}>{t.common.loading ?? 'Loading...'}</TableMessageRow>
+          ) : filteredRooms.length === 0 ? (
+            <TableMessageRow colSpan={8}>{t.common.noData}</TableMessageRow>
           ) : (
-            rooms.map((room, idx) => (
+            filteredRooms.map((room, idx) => (
               <TableRow key={room.global_id}>
                 <Td className="text-[#71717a]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</Td>
                 <Td className="font-medium">{room.room_name}</Td>
                 <Td className="font-medium">{room.total_movie}</Td>
-                <Td>-</Td>
+                <Td>{room.host?.name || room.host?.username || '-'}</Td>
                 <Td>
                   <span className="inline-flex items-center gap-1 text-white text-sm">
                     <Users2 className="w-3.5 h-3.5 text-[#71717a]" />
@@ -179,7 +202,6 @@ export default function Rooms() {
                 <Td className="text-[#71717a]">
                   {new Date(room.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </Td>
-                <Td className="text-[#71717a]">-</Td>
                 <Td>
                   <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusConfig(room.room_status).color}`}>
                     {getStatusConfig(room.room_status).label}
@@ -202,20 +224,23 @@ export default function Rooms() {
                       </button>
                       {openMenuId === room.global_id && (
                         <div className="absolute right-0 mt-1 w-44 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-20 overflow-hidden">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setEndRoomTarget(room); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white hover:bg-[#27272a] transition-colors"
-                          >
-                            <StopCircle className="w-4 h-4 text-[#f59e0b]" />
-                            End Room
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setDisableRoomTarget(room); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#ef4444] hover:bg-[#27272a] transition-colors"
-                          >
-                            <Ban className="w-4 h-4" />
-                            Disable Room
-                          </button>
+                          {room.room_status === 'inactive' ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setActivateRoomTarget(room); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#22c55e] hover:bg-[#27272a] transition-colors"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Activate Room
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setDisableRoomTarget(room); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#ef4444] hover:bg-[#27272a] transition-colors"
+                            >
+                              <Ban className="w-4 h-4" />
+                              Disable Room
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -227,8 +252,8 @@ export default function Rooms() {
         </TableBody>
       </TableContainer>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination — hidden while searching, since search only filters the current page */}
+      {!search && totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -272,14 +297,14 @@ export default function Rooms() {
               {modalTab === 'info' && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {[
-                    { label: t.rooms.modal.host, value: '-' },
-                    { label: 'Status', value: getStatusConfig(selectedRoom.room_status).label },
-                    { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString() },
-                    { label: t.rooms.modal.startedAt, value: '-' },
+                    { label: t.rooms.modal.roomId, value: selectedRoom.global_id, mono: true },
+                    { label: t.rooms.modal.host, value: (roomDetail ?? selectedRoom).host?.name || (roomDetail ?? selectedRoom).host?.username || '-', mono: false },
+                    { label: 'Status', value: getStatusConfig(selectedRoom.room_status).label, mono: false },
+                    { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString(), mono: false },
                   ].map((item) => (
-                    <div key={item.label}>
+                    <div key={item.label} className={item.mono ? 'col-span-2' : undefined}>
                       <p className="text-[#71717a] text-xs">{item.label}</p>
-                      <p className="text-white font-medium mt-0.5">{item.value}</p>
+                      <p className={`text-white font-medium mt-0.5 ${item.mono ? 'font-mono text-xs break-all' : ''}`}>{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -297,18 +322,26 @@ export default function Rooms() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#27272a]">
-                      {Array.from({ length: selectedRoom.total_movie }).map((_, i) => (
-                        <tr key={i}>
-                          <td className="px-3 py-2.5 text-white">-</td>
-                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
-                          <td className="px-3 py-2.5 text-right text-white">-</td>
-                        </tr>
-                      ))}
+                      {isLoadingDetail ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-[#71717a]">{t.common.loading ?? 'Loading...'}</td></tr>
+                      ) : !roomDetail || roomDetail.movies.length === 0 ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-[#71717a]">{t.common.noData}</td></tr>
+                      ) : (
+                        roomDetail.movies.map((movie) => (
+                          <tr key={movie.global_id}>
+                            <td className="px-3 py-2.5 text-white">{movie.title}</td>
+                            <td className="px-3 py-2.5 text-[#71717a] capitalize">{movie.content_type}</td>
+                            <td className="px-3 py-2.5 text-right text-white">{formatPrice(movie.base_price)}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                     <tfoot>
                       <tr className="border-t border-[#27272a]">
                         <td colSpan={2} className="px-3 py-2.5 text-[#71717a] text-xs font-bold uppercase">Total per new member</td>
-                        <td className="px-3 py-2.5 text-right text-white font-bold">-</td>
+                        <td className="px-3 py-2.5 text-right text-white font-bold">
+                          {formatPrice((roomDetail?.movies ?? []).reduce((sum, m) => sum + m.base_price, 0))}
+                        </td>
                       </tr>
                     </tfoot>
                   </table>
@@ -327,13 +360,19 @@ export default function Rooms() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#27272a]">
-                      {Array.from({ length: selectedRoom.current_participants }).map((_, i) => (
-                        <tr key={i}>
-                          <td className="px-3 py-2.5 text-white">-</td>
-                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
-                          <td className="px-3 py-2.5 text-[#71717a]">-</td>
-                        </tr>
-                      ))}
+                      {isLoadingDetail ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-[#71717a]">{t.common.loading ?? 'Loading...'}</td></tr>
+                      ) : !roomDetail || roomDetail.participants.length === 0 ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-[#71717a]">{t.common.noData}</td></tr>
+                      ) : (
+                        roomDetail.participants.map((p) => (
+                          <tr key={p.global_id}>
+                            <td className="px-3 py-2.5 text-white">{p.user.name || p.user.username}</td>
+                            <td className="px-3 py-2.5 text-[#71717a] capitalize">{p.user.access_type || '-'}</td>
+                            <td className="px-3 py-2.5 text-[#71717a]">{new Date(p.joined_at).toLocaleString()}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -344,17 +383,6 @@ export default function Rooms() {
       )}
 
       <ConfirmDialog
-        isOpen={!!endRoomTarget}
-        title="End Room"
-        message={`Are you sure you want to end "${endRoomTarget?.room_name}"? Participants will be disconnected.`}
-        confirmLabel="End Room"
-        variant="warning"
-        loading={isActioning}
-        onConfirm={handleEndRoom}
-        onCancel={() => setEndRoomTarget(null)}
-      />
-
-      <ConfirmDialog
         isOpen={!!disableRoomTarget}
         title="Disable Room"
         message={`Are you sure you want to disable "${disableRoomTarget?.room_name}"? This room will no longer be accessible.`}
@@ -363,6 +391,17 @@ export default function Rooms() {
         loading={isActioning}
         onConfirm={handleDisableRoom}
         onCancel={() => setDisableRoomTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={!!activateRoomTarget}
+        title="Activate Room"
+        message={`Are you sure you want to activate "${activateRoomTarget?.room_name}"? This room will become accessible again.`}
+        confirmLabel="Activate"
+        variant="success"
+        loading={isActioning}
+        onConfirm={handleActivateRoom}
+        onCancel={() => setActivateRoomTarget(null)}
       />
     </div>
   );

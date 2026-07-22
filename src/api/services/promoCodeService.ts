@@ -1,6 +1,6 @@
 import { apiClient } from "../clients/apiClient";
 
-export type PromoCodeType = "movie" | "subscription" | "product";
+export type PromoCodeType = "movie" | "subscription";
 
 export interface PromoCodeFromApi {
   id: number;

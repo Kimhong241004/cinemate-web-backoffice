@@ -17,7 +17,7 @@ import {
   type PromoCodeType,
 } from "../../../api/services/promoCodeService";
 
-type PromoCodeTypeFilter = "all" | "movie" | "subscription" | "product";
+type PromoCodeTypeFilter = "all" | "movie" | "subscription";
 
 const ENTRIES_PER_PAGE = 10;
 
@@ -74,8 +74,8 @@ const MOCK_PRIVATE_CODES: PromoCode[] = [
     globalId: "mock-private-3",
     id: -3,
     code: "PRIV10C",
-    description: "Private product discount",
-    promoCodeType: ["product"],
+    description: "Private subscription discount",
+    promoCodeType: ["subscription"],
     status: "inactive",
     discountType: "amount",
     discountValue: 10,
@@ -161,8 +161,6 @@ const PromoCodes = () => {
   const [formData, setFormData] = useState({
     code: "",
     quantity: "",
-    prefix: "",
-    suffix: "",
     description: "",
     promoCodeType: ["movie"] as string[],
     discountType: "percentage" as "percentage" | "amount",
@@ -330,7 +328,7 @@ const PromoCodes = () => {
           const random = Array.from({ length: 6 }, () =>
             chars[Math.floor(Math.random() * chars.length)],
           ).join("");
-          return `${formData.prefix}${random}${formData.suffix}`.toUpperCase();
+          return random.toUpperCase();
         };
         for (let i = 0; i < quantity; i++) {
           await promoCodeService.createPromoCode({
@@ -373,8 +371,6 @@ const PromoCodes = () => {
       setFormData({
         code: promo.code,
         quantity: "",
-        prefix: "",
-        suffix: "",
         description: promo.description,
         promoCodeType: promo.promoCodeType as string[],
         discountType: promo.discountType,
@@ -383,15 +379,13 @@ const PromoCodes = () => {
         usagePerUser: "",
         expiresAt: promo.expiresAt,
         status: promo.status === "expired" ? "inactive" : promo.status,
-        visibility: "public",
+        visibility: promo.visibility,
       });
     } else {
       setEditingPromo(null);
       setFormData({
         code: "",
         quantity: "",
-        prefix: "",
-        suffix: "",
         description: "",
         promoCodeType: ["movie"],
         discountType: "percentage",
@@ -420,8 +414,6 @@ const PromoCodes = () => {
     setFormData({
       code: "",
       quantity: "",
-      prefix: "",
-      suffix: "",
       description: "",
       promoCodeType: ["movie"],
       discountType: "percentage",
@@ -570,7 +562,6 @@ const PromoCodes = () => {
             options={[
               { value: "movie", label: t.promoCodes.typeMovie },
               { value: "subscription", label: t.promoCodes.typeSubscription },
-              { value: "product", label: t.promoCodes.typeProduct },
             ]}
           />
         </div>

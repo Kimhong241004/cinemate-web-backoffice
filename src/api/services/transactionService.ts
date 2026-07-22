@@ -35,9 +35,20 @@ export interface GetTransactionsResponse {
   data: TransactionFromApi[];
 }
 
+export interface GetTransactionsFilters {
+  type?: 'plan' | 'movie' | 'topup';
+  payment_status?: 'pending' | 'paid' | 'failed';
+  start_date?: string;
+  end_date?: string;
+}
+
 export const transactionService = {
-  getTransactions: (skip = 0, take = 10) =>
-    apiClient<GetTransactionsResponse>('/v1/transactions', {
-      params: { skip: String(skip), take: String(take) },
-    }),
+  getTransactions: (skip = 0, take = 10, filters: GetTransactionsFilters = {}) => {
+    const params: Record<string, string> = { skip: String(skip), take: String(take) };
+    if (filters.type) params.type = filters.type;
+    if (filters.payment_status) params.payment_status = filters.payment_status;
+    if (filters.start_date) params.start_date = filters.start_date;
+    if (filters.end_date) params.end_date = filters.end_date;
+    return apiClient<GetTransactionsResponse>('/v1/transactions', { params });
+  },
 };

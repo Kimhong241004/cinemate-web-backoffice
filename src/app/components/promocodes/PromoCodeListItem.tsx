@@ -41,7 +41,6 @@ interface Props {
 const TYPE_STYLE: Record<string, string> = {
   movie: "bg-[#3b82f6]/20 text-[#3b82f6]",
   subscription: "bg-[#10b981]/20 text-[#10b981]",
-  product: "bg-[#f59e0b]/20 text-[#f59e0b]",
 };
 
 const getProgressPercent = (usageCount: number, usageLimit: number) =>

@@ -25,10 +25,9 @@ export interface MovieAuthor {
 }
 
 export interface MovieSource {
-  id: number;
   global_id: string;
-  movie_url: string;
-  upload_status: string;
+  movie_url: string | null;
+  convert_status: string;
   created_at: string;
 }
 
@@ -62,7 +61,6 @@ export interface MovieFromApi {
   keywords: string;
   duration: number | null;
   trailer_url: string | null;
-  trailer_convert_status: string | null;
   poster_url: string | null;
   cover_url: string | null;
   movie_status: 'draft' | 'published' | 'unpublished';
@@ -105,6 +103,7 @@ export interface CreateMovieData {
   description: string;
   release_date: string;
   base_price: number;
+  price_per_episode?: number;
   language: string;
   country: string;
   video_quality: string;
@@ -115,13 +114,21 @@ export interface CreateMovieData {
   status: number;
   author_ids: string[];
   genre_ids: string[];
+  actor_ids?: string[];
+  /** upload_global_id of a completed full-movie video upload (content_type: movie) */
+  upload_id?: string;
+  /** upload_global_id of a completed trailer upload (movie or series) */
+  trailer_upload_id?: string;
   seasons?: {
     season_number: number;
     episodes: {
       episode_number: number;
       title: string;
-      duration: number;
-      release_date: string;
+      duration?: number;
+      release_date?: string;
+      is_free?: boolean;
+      /** upload_global_id of a completed episode video upload */
+      upload_id?: string;
     }[];
   }[];
 }
@@ -130,13 +137,50 @@ export interface UpdateMovieData extends Partial<CreateMovieData> {
   is_highlight?: boolean;
 }
 
-export interface UploadMovieFilesData {
+export interface UploadMovieMediaData {
   poster_file?: File;
   cover_file?: File;
-  trailer_file?: File;
-  movie_file?: File;
-  episode_file?: File;
-  episode_global_id?: string;
+}
+
+export type UploadTarget = 'trailer' | 'movie';
+
+export interface InitUploadData {
+  file_size: number;
+  file_name?: string;
+  mime_type?: string;
+  chunk_size?: number;
+}
+
+export interface UploadPartUrl {
+  part_number: number;
+  url: string;
+}
+
+export interface UploadSession {
+  upload_global_id: string;
+  upload_id: string;
+  object_key: string;
+  target: UploadTarget;
+  chunk_size: number;
+  total_parts: number;
+  expires_in: number;
+  parts: UploadPartUrl[];
+}
+
+export interface CompleteUploadPart {
+  part_number: number;
+  etag: string;
+}
+
+export interface UploadStatus {
+  upload_global_id: string;
+  target: UploadTarget;
+  upload_status: 'pending' | 'uploading' | 'completed' | 'aborted';
+  total_parts: number;
+  uploaded_parts: number;
+  progress: number;
+  convert_status?: string;
+  ref_id?: number;
 }
 
 export const movieService = {
@@ -174,18 +218,60 @@ export const movieService = {
     return apiClient<void>(`/v1/movies/${globalId}`, { method: 'DELETE' });
   },
 
-  uploadFiles: (globalId: string, data: UploadMovieFilesData) => {
+  uploadMedia: (globalId: string, data: UploadMovieMediaData) => {
     const form = new FormData();
     if (data.poster_file) form.append('poster_file', data.poster_file);
     if (data.cover_file) form.append('cover_file', data.cover_file);
-    if (data.trailer_file) form.append('trailer_file', data.trailer_file);
-    if (data.movie_file) form.append('movie_file', data.movie_file);
-    if (data.episode_file) form.append('episode_file', data.episode_file);
-    if (data.episode_global_id) form.append('episode_global_id', data.episode_global_id);
-    return apiClient<MovieFromApi>(`/v1/movies/${globalId}/upload`, {
+    return apiClient<MovieFromApi>(`/v1/movies/${globalId}/media`, {
       method: 'POST',
       body: form,
     });
+  },
+
+  initUpload: (target: UploadTarget, data: InitUploadData) => {
+    return apiClient<UploadSession>(`/v1/movies/uploads/${target}/init`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  completeUpload: (uploadGlobalId: string, parts: CompleteUploadPart[]) => {
+    return apiClient<void>(`/v1/movies/uploads/${uploadGlobalId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ parts }),
+    });
+  },
+
+  getUploadStatus: (uploadGlobalId: string) => {
+    return apiClient<UploadStatus>(`/v1/movies/uploads/${uploadGlobalId}/status`);
+  },
+
+  // Chunks `file` per the init session, PUTs each part to storage, completes the
+  // upload, and returns the upload_global_id for use as upload_id/trailer_upload_id.
+  uploadFileInChunks: async (target: UploadTarget, file: File): Promise<string> => {
+    const session = await movieService.initUpload(target, {
+      file_size: file.size,
+      file_name: file.name,
+      mime_type: file.type || 'video/mp4',
+    });
+
+    const parts: CompleteUploadPart[] = [];
+    for (const part of session.parts) {
+      const start = (part.part_number - 1) * session.chunk_size;
+      const chunk = file.slice(start, start + session.chunk_size);
+      const res = await fetch(part.url, { method: 'PUT', body: chunk });
+      if (!res.ok) {
+        throw new Error(`Failed to upload part ${part.part_number} of ${session.total_parts}`);
+      }
+      const etag = res.headers.get('ETag') ?? res.headers.get('etag');
+      if (!etag) {
+        throw new Error(`Storage did not return an ETag for part ${part.part_number} (check CORS Access-Control-Expose-Headers)`);
+      }
+      parts.push({ part_number: part.part_number, etag });
+    }
+
+    await movieService.completeUpload(session.upload_global_id, parts);
+    return session.upload_global_id;
   },
 
   getGenres: (params?: { skip?: number; take?: number }) => {

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, Download, X, Check, Eye } from 'lucide-react';
+import { Search, Download, X, Check, Eye, RefreshCw } from 'lucide-react';
 import Pagination from '../../components/shared/Pagination';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
 import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from '../../components/shared/Table/Table';
 import { useLanguage } from '../../context/LanguageContext';
-import { transactionService, type TransactionFromApi, type TransactionSummary, type TransactionUser } from '../../../api/services/transactionService';
+import { transactionService, type TransactionFromApi, type TransactionSummary, type TransactionUser, type GetTransactionsFilters } from '../../../api/services/transactionService';
 
 const TAKE = 10;
 
@@ -58,7 +58,9 @@ const Transactions = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const [viewTx, setViewTx] = useState<TransactionFromApi | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -70,7 +72,10 @@ const Transactions = () => {
     setIsLoading(true);
     try {
       const skip = (page - 1) * TAKE;
-      const res = await transactionService.getTransactions(skip, TAKE);
+      const res = await transactionService.getTransactions(skip, TAKE, {
+        payment_status: (selectedStatus || undefined) as GetTransactionsFilters['payment_status'],
+        type: (selectedType || undefined) as GetTransactionsFilters['type'],
+      });
       setTransactions(res.data.map((tx) => ({ ...tx, user: tx.user ?? GUEST_USER })));
       setSummary(res.summary);
       setTotal(res.total);
@@ -83,22 +88,45 @@ const Transactions = () => {
 
   useEffect(() => {
     fetchTransactions(currentPage);
-  }, [currentPage]);
+  }, [currentPage, selectedStatus, selectedType]);
 
-  useEffect(() => {
+  const handleRefreshRow = async (tx: TransactionFromApi) => {
+    setRefreshingId(tx.global_id);
+    try {
+      const skip = (currentPage - 1) * TAKE;
+      const res = await transactionService.getTransactions(skip, TAKE, {
+        payment_status: (selectedStatus || undefined) as GetTransactionsFilters['payment_status'],
+        type: (selectedType || undefined) as GetTransactionsFilters['type'],
+      });
+      setTransactions(res.data.map((t) => ({ ...t, user: t.user ?? GUEST_USER })));
+      setSummary(res.summary);
+      setTotal(res.total);
+    } catch {
+      showToast('Failed to refresh transaction', 'error');
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
+  const handleStatusSelect = (value: string) => {
+    setSelectedStatus(value);
     setCurrentPage(1);
-  }, [searchQuery, selectedStatus]);
+  };
 
-  // Backend only accepts skip/take — search/status filter the current page only.
+  const handleTypeSelect = (value: string) => {
+    setSelectedType(value);
+    setCurrentPage(1);
+  };
+
+  // payment_status/type are filtered server-side; search only narrows the current page.
   const filtered = transactions.filter((tx) => {
     const q = searchQuery.toLowerCase();
-    const matchSearch =
+    return (
       !q ||
       (tx.transaction_id ?? '').toLowerCase().includes(q) ||
       tx.user.name.toLowerCase().includes(q) ||
-      tx.user.contact.toLowerCase().includes(q);
-    const matchStatus = !selectedStatus || tx.payment_status === selectedStatus;
-    return matchSearch && matchStatus;
+      tx.user.contact.toLowerCase().includes(q)
+    );
   });
 
   const totalPages = Math.max(1, Math.ceil(total / TAKE));
@@ -115,10 +143,15 @@ const Transactions = () => {
   ];
 
   const statusOptions = [
-    { value: 'pending',    label: t.transactions.pending },
-    { value: 'processing', label: 'Processing' },
-    { value: 'paid',       label: 'Paid' },
-    { value: 'failed',     label: t.transactions.failed },
+    { value: 'pending', label: t.transactions.pending },
+    { value: 'paid',    label: 'Paid' },
+    { value: 'failed',  label: t.transactions.failed },
+  ];
+
+  const typeOptions = [
+    { value: 'plan',  label: t.transactions.typePlan },
+    { value: 'movie', label: t.transactions.typeMovie },
+    { value: 'topup', label: t.transactions.typeTopup },
   ];
 
   return (
@@ -163,12 +196,30 @@ const Transactions = () => {
           </div>
 
           <StatusFilterDropdown
+            label={t.transactions.type}
+            allLabel={t.transactions.allTypes}
+            selectedValue={selectedType}
+            onSelect={handleTypeSelect}
+            options={typeOptions}
+          />
+
+          <StatusFilterDropdown
             label={t.transactions.status}
             allLabel={t.transactions.allStatus}
             selectedValue={selectedStatus}
-            onSelect={setSelectedStatus}
+            onSelect={handleStatusSelect}
             options={statusOptions}
           />
+
+          <button
+            onClick={() => fetchTransactions(currentPage)}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg text-white text-sm font-medium hover:bg-[#27272a] transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Table */}
@@ -250,6 +301,14 @@ const Transactions = () => {
                         title="View"
                       >
                         <Eye className="w-4 h-4 text-[#6C5CE7]" />
+                      </button>
+                      <button
+                        onClick={() => handleRefreshRow(tx)}
+                        disabled={refreshingId === tx.global_id}
+                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors disabled:opacity-50"
+                        title="Refresh"
+                      >
+                        <RefreshCw className={`w-4 h-4 text-[#22c55e] ${refreshingId === tx.global_id ? 'animate-spin' : ''}`} />
                       </button>
                     </div>
                   </Td>

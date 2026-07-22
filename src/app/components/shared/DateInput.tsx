@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface DateRangeValue {
   start: Date | null;
@@ -16,6 +16,13 @@ interface DateInputProps {
 }
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+const MONTHS = Array.from({ length: 12 }, (_, i) =>
+  new Date(2000, i, 1).toLocaleDateString("en-US", { month: "short" }),
+);
+
+const currentRealYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 101 }, (_, i) => currentRealYear - 50 + i);
 
 const PRESETS: { key: string; label: string; days: number }[] = [
   { key: "7d", label: "7d", days: 7 },
@@ -148,10 +155,14 @@ const DateInput = ({
   const [open, setOpen] = useState(false);
   const [confirmError, setConfirmError] = useState("");
   const [viewDate, setViewDate] = useState<Date>(range.start ?? new Date());
+  const [monthMenuOpen, setMonthMenuOpen] = useState(false);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
 
   const fieldRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
+  const monthMenuRef = useRef<HTMLDivElement>(null);
+  const yearMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -171,12 +182,45 @@ const DateInput = ({
   }, [customEditing]);
 
   useEffect(() => {
+    if (!monthMenuOpen && !yearMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (monthMenuRef.current?.contains(target) || yearMenuRef.current?.contains(target)) {
+        return;
+      }
+      setMonthMenuOpen(false);
+      setYearMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [monthMenuOpen, yearMenuOpen]);
+
+  useEffect(() => {
+    if (!monthMenuOpen) return;
+    monthMenuRef.current
+      ?.querySelector('[data-selected="true"]')
+      ?.scrollIntoView({ block: "center" });
+  }, [monthMenuOpen]);
+
+  useEffect(() => {
+    if (!yearMenuOpen) return;
+    yearMenuRef.current
+      ?.querySelector('[data-selected="true"]')
+      ?.scrollIntoView({ block: "center" });
+  }, [yearMenuOpen]);
+
+  useEffect(() => {
     if (!open) return;
     const id = requestAnimationFrame(() => {
       panelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
     return () => cancelAnimationFrame(id);
   }, [open]);
+
+  const closeMenus = () => {
+    setMonthMenuOpen(false);
+    setYearMenuOpen(false);
+  };
 
   const openPanel = () => {
     setDraftRange(range);
@@ -186,6 +230,7 @@ const DateInput = ({
     setCustomEditing(false);
     setCustomText("");
     setViewDate(range.start ?? new Date());
+    closeMenus();
     setOpen(true);
   };
 
@@ -202,12 +247,14 @@ const DateInput = ({
     setRange(finalRange);
     onChange?.(finalRange);
     setConfirmError("");
+    closeMenus();
     setOpen(false);
   };
 
   const handleCancel = () => {
     setDraftRange(range);
     setConfirmError("");
+    closeMenus();
     setOpen(false);
   };
 
@@ -262,8 +309,28 @@ const DateInput = ({
     setConfirmError("");
   };
 
-  const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long" });
+  const monthLabel = MONTHS[viewDate.getMonth()];
   const yearLabel = viewDate.getFullYear();
+
+  const selectMonth = (monthIndex: number) => {
+    setViewDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(1);
+      next.setMonth(monthIndex);
+      return next;
+    });
+    setMonthMenuOpen(false);
+  };
+
+  const selectYear = (year: number) => {
+    setViewDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(1);
+      next.setFullYear(year);
+      return next;
+    });
+    setYearMenuOpen(false);
+  };
   const today = startOfDay(new Date());
 
   const previewEnd =
@@ -360,43 +427,112 @@ const DateInput = ({
           </div>
 
           <div className="flex items-center justify-center gap-4 mb-3">
-            <div className="flex items-center gap-1 bg-[#27272a] rounded-full px-1 py-1">
-              <button
-                type="button"
-                onClick={() => setViewDate((prev) => addMonths(prev, -1))}
-                className="p-1 rounded-full hover:bg-[#3f3f46]"
-              >
-                <ChevronLeft className="w-4 h-4 text-white" />
-              </button>
-              <span className="text-white text-sm font-medium px-2 min-w-[84px] text-center">
-                {monthLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() => setViewDate((prev) => addMonths(prev, 1))}
-                className="p-1 rounded-full hover:bg-[#3f3f46]"
-              >
-                <ChevronRight className="w-4 h-4 text-white" />
-              </button>
+            <div ref={monthMenuRef} className="relative">
+              <div className="flex items-center gap-1 bg-[#27272a] rounded-full px-1 py-1">
+                <button
+                  type="button"
+                  onClick={() => setViewDate((prev) => addMonths(prev, -1))}
+                  className="p-1 rounded-full hover:bg-[#3f3f46]"
+                >
+                  <ChevronLeft className="w-4 h-4 text-white" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMonthMenuOpen((o) => !o);
+                    setYearMenuOpen(false);
+                  }}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-white text-sm font-medium hover:bg-[#3f3f46]"
+                >
+                  <span className="min-w-[32px] text-center">{monthLabel}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#a1a1aa]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewDate((prev) => addMonths(prev, 1))}
+                  className="p-1 rounded-full hover:bg-[#3f3f46]"
+                >
+                  <ChevronRight className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              {monthMenuOpen && (
+                <div className="absolute z-10 top-full mt-2 left-1/2 -translate-x-1/2 w-28 max-h-40 overflow-y-auto bg-[#18181b] border border-[#27272a] rounded-xl shadow-lg py-1">
+                  {MONTHS.map((label, i) => {
+                    const selected = i === viewDate.getMonth();
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        data-selected={selected}
+                        onClick={() => selectMonth(i)}
+                        className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-sm text-left transition-colors ${
+                          selected
+                            ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white font-semibold"
+                            : "text-[#a1a1aa] hover:bg-[#27272a]"
+                        }`}
+                      >
+                        {selected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1 bg-[#27272a] rounded-full px-1 py-1">
-              <button
-                type="button"
-                onClick={() => setViewDate((prev) => addYears(prev, -1))}
-                className="p-1 rounded-full hover:bg-[#3f3f46]"
-              >
-                <ChevronLeft className="w-4 h-4 text-white" />
-              </button>
-              <span className="text-white text-sm font-medium px-2 min-w-[48px] text-center">
-                {yearLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() => setViewDate((prev) => addYears(prev, 1))}
-                className="p-1 rounded-full hover:bg-[#3f3f46]"
-              >
-                <ChevronRight className="w-4 h-4 text-white" />
-              </button>
+
+            <div ref={yearMenuRef} className="relative">
+              <div className="flex items-center gap-1 bg-[#27272a] rounded-full px-1 py-1">
+                <button
+                  type="button"
+                  onClick={() => setViewDate((prev) => addYears(prev, -1))}
+                  className="p-1 rounded-full hover:bg-[#3f3f46]"
+                >
+                  <ChevronLeft className="w-4 h-4 text-white" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYearMenuOpen((o) => !o);
+                    setMonthMenuOpen(false);
+                  }}
+                  className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-white text-sm font-medium hover:bg-[#3f3f46]"
+                >
+                  <span className="min-w-[36px] text-center">{yearLabel}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#a1a1aa]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewDate((prev) => addYears(prev, 1))}
+                  className="p-1 rounded-full hover:bg-[#3f3f46]"
+                >
+                  <ChevronRight className="w-4 h-4 text-white" />
+                </button>
+              </div>
+
+              {yearMenuOpen && (
+                <div className="absolute z-10 top-full mt-2 left-1/2 -translate-x-1/2 w-24 max-h-40 overflow-y-auto bg-[#18181b] border border-[#27272a] rounded-xl shadow-lg py-1">
+                  {YEARS.map((year) => {
+                    const selected = year === yearLabel;
+                    return (
+                      <button
+                        key={year}
+                        type="button"
+                        data-selected={selected}
+                        onClick={() => selectYear(year)}
+                        className={`w-full flex items-center gap-1.5 px-3 py-1.5 text-sm text-left transition-colors ${
+                          selected
+                            ? "bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white font-semibold"
+                            : "text-[#a1a1aa] hover:bg-[#27272a]"
+                        }`}
+                      >
+                        {selected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                        {year}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

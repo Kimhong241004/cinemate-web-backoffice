@@ -53,6 +53,13 @@ const EditMovie = () => {
     if (!id) return;
     setIsSubmitting(true);
     try {
+      // Trailer/video must be uploaded (chunked, direct-to-storage) before the
+      // movie is updated — the movie payload references them by upload_global_id.
+      const [trailerUploadId, movieUploadId] = await Promise.all([
+        files.trailer ? movieService.uploadFileInChunks('trailer', files.trailer) : Promise.resolve(undefined),
+        files.video ? movieService.uploadFileInChunks('movie', files.video) : Promise.resolve(undefined),
+      ]);
+
       await movieService.updateMovie(id, {
         content_type: values.uploadType === 'series' ? 'series' : 'movie',
         title: values.title,
@@ -67,14 +74,14 @@ const EditMovie = () => {
         status: 1,
         author_ids: [],
         genre_ids: [],
+        upload_id: movieUploadId,
+        trailer_upload_id: trailerUploadId,
       });
 
-      if (files.poster || files.cover || files.trailer || files.video) {
-        await movieService.uploadFiles(id, {
+      if (files.poster || files.cover) {
+        await movieService.uploadMedia(id, {
           poster_file: files.poster ?? undefined,
           cover_file: files.cover ?? undefined,
-          trailer_file: files.trailer ?? undefined,
-          movie_file: files.video ?? undefined,
         });
       }
 
@@ -106,7 +113,12 @@ const EditMovie = () => {
       submittingLabel="Updating..."
       isSubmitting={isSubmitting}
       initialValues={movie ? toFormValues(movie) : undefined}
-      initialPreviews={{ poster: movie?.poster_url ?? '', cover: movie?.cover_url ?? '' }}
+      initialPreviews={{
+        poster: movie?.poster_url ?? '',
+        cover: movie?.cover_url ?? '',
+        trailer: movie?.trailer_url ?? '',
+        video: movie?.sources?.[0]?.movie_url ?? '',
+      }}
       onCancel={() => navigate('/movies')}
       onSubmit={handleSubmit}
       showToast={showToast}

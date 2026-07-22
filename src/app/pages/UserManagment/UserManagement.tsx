@@ -66,67 +66,31 @@ const UserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Omitting user_type returns every account type, including guests
+      // (the API rejects user_type=guest as an explicit filter value, so
+      // "Guest" is still filtered client-side on the current page below).
+      // Creators are excluded here since they're managed on their own page.
       const res = await userService.getUsers({
         page: currentPage,
         take: ITEMS_PER_PAGE,
         search: debouncedSearch || undefined,
-        user_type: userTypeFilter !== "all" ? userTypeFilter : undefined,
+        user_type: accountTypeFilter === "registered" ? "regular" : undefined,
       });
-      // Add mock account_type: "registered" to API users
-      const usersWithAccountType = res.data.map(user => ({
-        ...user,
-        account_type: "registered" as const,
-      }));
-      
-      // Add 2 guest users if on first page
-      if (currentPage === 1) {
-        const guestUsers: UserFromApi[] = [
-          {
-            global_id: "gst-a2f9c1d",
-            username: "",
-            name: "",
-            email: "",
-            phone_number: null,
-            profile_url: null,
-            user_type: "regular",
-            follower_count: 0,
-            following_count: 0,
-            post_count: 0,
-            status: 1,
-            is_blocked: false,
-            last_login: "2026-06-09T10:00:00",
-            created_at: "2026-06-09T10:00:00",
-            account_type: "guest" as const,
-          },
-          {
-            global_id: "gst-7b8e3d2a",
-            username: "",
-            name: "",
-            email: "",
-            phone_number: null,
-            profile_url: null,
-            user_type: "regular",
-            follower_count: 0,
-            following_count: 0,
-            post_count: 0,
-            status: 1,
-            is_blocked: false,
-            last_login: "2026-06-08T09:15:00",
-            created_at: "2026-06-08T09:15:00",
-            account_type: "guest" as const,
-          },
-        ];
-        usersWithAccountType.push(...guestUsers);
-      }
-      
+      const usersWithAccountType: UserFromApi[] = res.data
+        .filter((user) => user.user_type !== "creator")
+        .map((user) => ({
+          ...user,
+          account_type: user.user_type === "guest" ? "guest" as const : "registered" as const,
+        }));
+
       setUsers(usersWithAccountType);
-      setTotal(res.total ?? res.data.length);
+      setTotal(res.meta.total);
     } catch {
       showToast("Failed to load users", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearch, userTypeFilter]);
+  }, [currentPage, debouncedSearch, accountTypeFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -177,17 +141,15 @@ const UserManagement = () => {
     }
   };
 
-  // Client-side status and account type filter (API doesn't support status param)
+  // Client-side status filter (API doesn't support a status param) and guest
+  // filter (API rejects user_type=guest, so this only narrows the current page —
+  // "registered" is filtered server-side via user_type=regular instead, see fetchUsers).
   const filteredUsers = users.filter((user) => {
-    if (statusFilter === "active") {
-      if (user.status !== 1) return false;
-    }
-    if (statusFilter === "suspended") {
-      if (user.status !== 0) return false;
-    }
-    if (accountTypeFilter !== "") {
+    if (statusFilter === "active" && user.status !== 1) return false;
+    if (statusFilter === "suspended" && user.status !== 0) return false;
+    if (accountTypeFilter === "guest") {
       const userAccountType = user.account_type ?? 'guest';
-      if (userAccountType !== accountTypeFilter) return false;
+      if (userAccountType !== "guest") return false;
     }
     return true;
   });
@@ -543,14 +505,14 @@ const UserManagement = () => {
                     {selectedUser.phone_number}
                   </p>
                   <div className="flex items-center gap-2 mt-3">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-500/10 text-blue-500 capitalize">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#3b82f6]/20 text-[#3b82f6] capitalize">
                       {selectedUser.user_type}
                     </span>
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
                         selectedUser.status === 1
-                          ? "bg-green-500/10 text-green-500"
-                          : "bg-red-500/10 text-red-500"
+                          ? "bg-[#22c55e]/20 text-[#22c55e]"
+                          : "bg-[#ef4444]/20 text-[#ef4444]"
                       }`}
                     >
                       {selectedUser.status === 1
@@ -602,7 +564,11 @@ const UserManagement = () => {
                     setShowUserDetail(false);
                     setShowSuspendConfirm(true);
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-colors text-sm font-semibold disabled:opacity-40"
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg transition-colors text-sm font-semibold disabled:opacity-40 ${
+                    selectedUser.status === 1
+                      ? "bg-[#ef4444] hover:bg-[#dc2626]"
+                      : "bg-[#22c55e] hover:bg-[#16a34a]"
+                  }`}
                 >
                   {selectedUser.status === 1
                     ? t.userManagement.userDetail.suspend
