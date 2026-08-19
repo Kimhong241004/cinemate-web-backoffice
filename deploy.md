@@ -4,15 +4,16 @@ Edited by Mengheng
 How to wire up CI + Portainer for `cinemate-web-backoffice` (the MOI TV /
 CINEMATE admin dashboard — Vite + React SPA, built with pnpm), mirroring the
 **exact pattern already used for `cinemate-api`** in this Portainer
-environment: one Docker Hub image repo per environment (`*-dev` / `*-prod`),
-each running as its own Swarm service with its own container, deployed
-independently.
+environment: one Docker Hub image repo shared by both environments,
+distinguished by tag (`:dev` / `:prod`), each tag run as its own Swarm
+service/container, deployed independently.
 
 | | `cinemate-api` (existing) | `cinemate-web-backoffice` (this doc) |
 |---|---|---|
-| Docker Hub images | `docker.io/<user>/cinemate-api-dev`, `docker.io/<user>/cinemate-api-prod` | `docker.io/<user>/cinemate-admin-dev`, `docker.io/<user>/cinemate-admin-prod` |
+| Docker Hub image | `docker.io/socheatsama/cinemate-api` (tags `dev`, `prod`) | `docker.io/<user>/cinemate-admin` (tags `dev`, `prod`) |
 | Portainer services | `cinemate-api-dev`, `cinemate-api-prod` | `cinemate-admin-dev`, `cinemate-admin-prod` |
-| Trigger branch | `dev` → dev image, `main` → prod image | same |
+| Container port | `3000` (both) | `80` (nginx, both) |
+| Trigger branch | `dev` → `:dev` tag, `main` → `:prod` tag | same |
 
 **Shape of the deployment:** the image is a multi-stage build — a Node/pnpm
 stage compiles the SPA to static files (`vite build` → `dist/`), and an nginx
@@ -119,9 +120,9 @@ jobs:
         run: |
           BRANCH=${GITHUB_REF_NAME}
           if [ "$BRANCH" = "main" ]; then
-            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin-prod:latest" >> $GITHUB_OUTPUT
+            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin:prod" >> $GITHUB_OUTPUT
           elif [ "$BRANCH" = "dev" ]; then
-            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin-dev:latest" >> $GITHUB_OUTPUT
+            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin:dev" >> $GITHUB_OUTPUT
           else
             echo "Unrecognized branch: $BRANCH" >&2
             exit 1
@@ -139,25 +140,23 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
-Push to `dev` → `docker.io/<user>/cinemate-admin-dev:latest`. Push to `main`
-→ `docker.io/<user>/cinemate-admin-prod:latest`. Two separate Docker Hub
-repos, exactly like `cinemate-api-dev` / `cinemate-api-prod`.
+Push to `dev` → `docker.io/<user>/cinemate-admin:dev`. Push to `main` →
+`docker.io/<user>/cinemate-admin:prod`. One Docker Hub repo, two tags —
+exactly like `socheatsama/cinemate-api:dev` / `:prod`.
 
 **Notes**
-- `cinemate-admin` is just an example name prefix — pick something distinct
+- `cinemate-admin` is just an example repo name — pick something distinct
   from `cinemate-api`; rename in both the workflow and the Portainer stacks
-  below if you'd rather match the repo name exactly
-  (`cinemate-web-backoffice-dev` / `-prod`).
+  below if you'd rather match the repo name exactly (`cinemate-web-backoffice`).
 - `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are GitHub Actions secrets scoped
   **per repo** — add them under this repo's Settings → Secrets and variables
   → Actions (same Docker Hub account/token `cinemate-api` uses is fine).
 - The `pnpm install` + `vite build` happen *inside* the Docker build (in the
   `Dockerfile`'s first stage), not on the GitHub runner — this workflow only
   needs Docker Buildx, it doesn't need a Node/pnpm setup step itself.
-- If the Docker Hub repos `cinemate-admin-dev` / `cinemate-admin-prod` don't
-  exist yet, either create them first on Docker Hub, or push once manually
-  (`docker push`) — most Docker Hub accounts auto-create a repo on first push
-  from a token with write access.
+- If the `cinemate-admin` Docker Hub repo doesn't exist yet, either create it
+  first, or push once manually (`docker push`) — most Docker Hub accounts
+  auto-create a repo on first push from a token with write access.
 
 ## 3. Add the two services in Portainer (dev + prod)
 
@@ -171,9 +170,13 @@ stacks** for the dashboard too — `cinemate-admin-dev` and
 1. **Shared network for the `/api` proxy.** nginx proxies `/api/*` to
    `cinemate-api-dev`/`cinemate-api-prod` by container DNS name, so each
    dashboard service needs to be on the same Swarm overlay network as its
-   matching API service. Check what network `cinemate-api-dev`/`-prod` are
-   already attached to (Portainer → that service → look at *Network*) and
-   reuse it — don't create a second one. If none exists yet:
+   matching API service. Both `cinemate-api-dev` and `cinemate-api-prod`
+   listen on container port **3000** internally (confirmed via Portainer →
+   that service → *Published ports*: host 3001/3002 → container 3000 — the
+   container port is what matters here, the host port isn't used for
+   service-to-service traffic). Check Portainer → that service → *Network*
+   for the exact overlay network name and use it in place of `cinemate-net`
+   below — reuse it, don't create a second one. If none exists yet:
    ```
    docker network create -d overlay cinemate-net
    ```
@@ -186,9 +189,9 @@ stacks** for the dashboard too — `cinemate-admin-dev` and
    ```yaml
    services:
      cinemate-admin-dev:
-       image: docker.io/<dockerhub-username>/cinemate-admin-dev:latest
+       image: docker.io/<dockerhub-username>/cinemate-admin:dev
        environment:
-         API_PROXY_TARGET: http://cinemate-api-dev:<API_PORT>   # scheme://service-name:port, no path
+         API_PROXY_TARGET: http://cinemate-api-dev:3000   # scheme://service-name:container-port, no path
        ports:
          - "<DEV_PORT>:80"   # nginx listens on 80 inside the container
        networks:
@@ -203,18 +206,17 @@ stacks** for the dashboard too — `cinemate-admin-dev` and
        external: true
    ```
 
-   **`cinemate-admin-prod`:** identical, but `image: ...cinemate-admin-prod:latest`,
-   `API_PROXY_TARGET: http://cinemate-api-prod:<API_PORT>`, and a different
+   **`cinemate-admin-prod`:** identical, but `image: ...cinemate-admin:prod`,
+   `API_PROXY_TARGET: http://cinemate-api-prod:3000`, and a different
    `<PROD_PORT>` (Swarm's ingress mesh needs a unique published port per
    service on the node).
 
    Note: `restart: unless-stopped` is a **standalone-Compose key and is
    silently ignored in Swarm mode** — use `deploy.restart_policy` instead, as
-   above. Confirm `<DEV_PORT>`/`<PROD_PORT>`, `<API_PORT>`, and
-   reverse-proxy/domain routing with whoever manages that — Swarm publishes
-   ports via the **ingress routing mesh** by default, meaning the port
-   becomes reachable from *every* swarm node, not just the one running the
-   container.
+   above. Confirm `<DEV_PORT>`/`<PROD_PORT>` and reverse-proxy/domain routing
+   with whoever manages that — Swarm publishes ports via the **ingress
+   routing mesh** by default, meaning the port becomes reachable from *every*
+   swarm node, not just the one running the container.
 
 3. **Deploy each stack** — Portainer pulls the image and creates the service
    (`replicas: 1` = one container/task; raise it later for more instances
@@ -224,8 +226,8 @@ stacks** for the dashboard too — `cinemate-admin-dev` and
 
 ## 4. Day-to-day flow
 
-1. Push to `dev` → CI builds and pushes `cinemate-admin-dev:latest`. Push to
-   `main` → CI builds and pushes `cinemate-admin-prod:latest`.
+1. Push to `dev` → CI builds and pushes `cinemate-admin:dev`. Push to `main`
+   → CI builds and pushes `cinemate-admin:prod`.
 2. In Portainer, open the matching stack (`cinemate-admin-dev` or
    `cinemate-admin-prod`) → **Pull and redeploy** to pick up the new image.
    Swarm performs a **rolling update** — it starts the new container and only
