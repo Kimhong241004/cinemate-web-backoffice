@@ -28,9 +28,12 @@ jobs:
         run: |
           BRANCH=${GITHUB_REF_NAME}
           if [ "$BRANCH" = "main" ]; then
-            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin:prod" >> $GITHUB_OUTPUT
+            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin-prod:latest" >> $GITHUB_OUTPUT
+          elif [ "$BRANCH" = "dev" ]; then
+            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin-dev:latest" >> $GITHUB_OUTPUT
           else
-            echo "TAG=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/cinemate-admin:${BRANCH}" >> $GITHUB_OUTPUT
+            echo "Unrecognized branch: $BRANCH" >&2
+            exit 1
           fi
 
       - name: Build and push image
