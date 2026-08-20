@@ -73,7 +73,7 @@ const UserSystem = () => {
     username: "",
     email: "",
     password: "",
-    role: "Admin",
+    role: "admin",
     profile_url: "",
   });
   const [formErrors, setFormErrors] = useState<Partial<FormData>>({});
@@ -98,7 +98,12 @@ const UserSystem = () => {
     try {
       setIsLoading(true);
       const skip = (currentPage - 1) * 10;
-      const response = await adminService.getAdmins(skip, 10);
+      const response = await adminService.getAdmins({
+        skip,
+        take: 10,
+        search: searchQuery || undefined,
+        status: selectedStatus ? (parseInt(selectedStatus) as 0 | 1) : undefined,
+      });
       setUsers(response.data);
       setTotalUsers(response.total);
     } catch (error) {
@@ -110,16 +115,7 @@ const UserSystem = () => {
 
   useEffect(() => {
     fetchAdmins();
-  }, [currentPage]);
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      !selectedStatus || user.status === parseInt(selectedStatus);
-    return matchesSearch && matchesStatus;
-  });
+  }, [currentPage, searchQuery, selectedStatus]);
 
   const itemsPerPage = 10;
   const totalPages = Math.ceil(totalUsers / itemsPerPage);
@@ -157,7 +153,7 @@ const UserSystem = () => {
       username: "",
       email: "",
       password: "",
-      role: "Admin",
+      role: "admin",
       profile_url: "",
     });
     setFormErrors({});
@@ -177,6 +173,7 @@ const UserSystem = () => {
         email: formData.email,
         password: formData.password,
         profile_url: formData.profile_url || undefined,
+        role: formData.role,
         status: 1,
       });
       showToast(
@@ -200,7 +197,7 @@ const UserSystem = () => {
       username: user.username,
       email: user.email,
       password: "",
-      role: user.role || "Admin",
+      role: user.role || "admin",
       profile_url: user.profile_url || "",
     });
   };
@@ -216,6 +213,7 @@ const UserSystem = () => {
       await adminService.updateAdmin(editUser.global_id, {
         username: formData.username,
         email: formData.email,
+        role: formData.role,
         ...(formData.password && { password: formData.password }),
         ...(formData.profile_url && { profile_url: formData.profile_url }),
       });
@@ -369,7 +367,7 @@ const UserSystem = () => {
             type="text"
             placeholder={t.userSystem.searchPlaceholder}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             className="w-full pl-11 pr-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-xl text-white placeholder-[#71717a] text-sm focus:outline-none focus:border-[#3b82f6]"
           />
         </div>
@@ -379,7 +377,7 @@ const UserSystem = () => {
           label={t.userSystem.status}
           allLabel={t.userSystem.allStatus}
           selectedValue={selectedStatus}
-          onSelect={setSelectedStatus}
+          onSelect={(v) => { setSelectedStatus(v); setCurrentPage(1); }}
           options={[
             { value: "1", label: t.userSystem.active },
             { value: "0", label: t.userSystem.banned },
@@ -411,7 +409,7 @@ const UserSystem = () => {
                 </div>
               </td>
             </tr>
-          ) : filteredUsers.length === 0 ? (
+          ) : users.length === 0 ? (
             <tr>
               <td colSpan={8} className="px-4 py-12 text-center">
                 <User className="w-12 h-12 text-[#71717a] mx-auto mb-3" />
@@ -421,7 +419,7 @@ const UserSystem = () => {
               </td>
             </tr>
           ) : (
-            filteredUsers.map((user, index) => (
+            users.map((user, index) => (
               <TableRow key={user.global_id}>
                 <Td>{(currentPage - 1) * itemsPerPage + index + 1}</Td>
                 <Td>
@@ -442,8 +440,8 @@ const UserSystem = () => {
                 <Td>{user.email}</Td>
                 <Td>{user.username}</Td>
                 <Td>
-                  <span className="inline-flex px-3 py-1 text-xs rounded-full border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20">
-                    {user.role || "Admin"}
+                  <span className="inline-flex px-3 py-1 text-xs rounded-full border bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20 capitalize">
+                    {user.role || "admin"}
                   </span>
                 </Td>
                 <Td>
@@ -632,9 +630,11 @@ const UserSystem = () => {
                     }
                     className="w-full pl-11 pr-4 py-2.5 bg-[#0a0a0a] border border-[#27272a] rounded-xl text-white text-sm focus:outline-none focus:border-[#3b82f6] appearance-none cursor-pointer"
                   >
-                    <option value="Admin">Admin</option>
-                    <option value="Editor">Editor</option>
-                    <option value="Viewer">Viewer</option>
+                    <option value="admin">Admin</option>
+                    {/* Editor / Viewer roles disabled until confirmed valid on the backend
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                    */}
                   </select>
                 </div>
               </div>
@@ -744,7 +744,7 @@ const UserSystem = () => {
                 {/* Roles - TODO: Update with API data */}
                 {[
                   {
-                    role: "Admin",
+                    role: "admin",
                     color: "#ef4444",
                     access: t.userSystem.adminAccess,
                   },

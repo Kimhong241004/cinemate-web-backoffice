@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useNotification } from '../../context/NotificationContext';
+import { useUploadManager } from '../../context/UploadManagerContext';
 import MovieForm, { MovieFormValues, MovieFormFiles } from '../../components/moviesform/MovieForm';
-import { movieService, MovieFromApi } from '../../../api/services/movieService';
+import { movieService, MovieFromApi, CreateMovieData } from '../../../api/services/movieService';
+import { Season } from '../../../types/movie';
 
 const qualityFromApi: Record<string, string> = {
   full_hd: 'FHD',
@@ -19,7 +21,7 @@ const qualityToApi: Record<string, string> = {
 const toFormValues = (movie: MovieFromApi): Partial<MovieFormValues> => ({
   title: movie.title,
   releaseYear: movie.release_date ? movie.release_date.substring(0, 4) : '',
-  genre: movie.genres.map((g) => g.name),
+  genre: movie.genres.map((g) => g.global_id),
   language: movie.language,
   quality: qualityFromApi[movie.video_quality] ?? 'HD',
   description: movie.description,
@@ -27,6 +29,8 @@ const toFormValues = (movie: MovieFromApi): Partial<MovieFormValues> => ({
   accessType: movie.movie_type ? [movie.movie_type as 'buy' | 'membership' | 'free'] : [],
   uploadType: movie.content_type === 'series' ? 'series' : 'full',
   price: String(movie.base_price),
+  episodePrice: movie.price_per_episode !== undefined ? String(movie.price_per_episode) : '',
+  authors: movie.movie_authors.map((a) => a.global_id),
   status: movie.movie_status === 'published' ? 'publish' : movie.movie_status === 'unpublished' ? 'unpublished' : 'draft',
 });
 
@@ -34,6 +38,7 @@ const EditMovie = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { showToast } = useNotification();
+  const { startBackgroundUpload } = useUploadManager();
 
   const [movie, setMovie] = useState<MovieFromApi | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,33 +54,53 @@ const EditMovie = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleSubmit = async (values: MovieFormValues, files: MovieFormFiles) => {
+  const handleSubmit = async (values: MovieFormValues, files: MovieFormFiles, seasons: Season[]) => {
     if (!id) return;
     setIsSubmitting(true);
     try {
-      // Trailer/video must be uploaded (chunked, direct-to-storage) before the
-      // movie is updated — the movie payload references them by upload_global_id.
-      const [trailerUploadId, movieUploadId] = await Promise.all([
-        files.trailer ? movieService.uploadFileInChunks('trailer', files.trailer) : Promise.resolve(undefined),
-        files.video ? movieService.uploadFileInChunks('movie', files.video) : Promise.resolve(undefined),
-      ]);
+      // Episode videos ride inside the updateMovie payload (each needs an upload_id
+      // up front), so unlike the trailer/full-movie video they can't be backgrounded —
+      // upload them first and block on it. Omitted entirely when the admin didn't touch
+      // the Seasons section, so existing episodes on the server aren't wiped out.
+      let seasonsPayload: CreateMovieData['seasons'];
+      if (values.uploadType === 'series' && seasons.length > 0) {
+        seasonsPayload = await Promise.all(
+          seasons.map(async (season) => ({
+            season_number: season.seasonNumber,
+            episodes: await Promise.all(
+              season.episodes.map(async (episode) => ({
+                episode_number: episode.episodeNumber,
+                title: episode.title,
+                release_date: episode.releaseDate || undefined,
+                is_free: episode.isFree,
+                upload_id: episode.videoFile
+                  ? await movieService.uploadFileInChunks('movie', episode.videoFile)
+                  : undefined,
+              }))
+            ),
+          }))
+        );
+      }
 
+      // Update the movie's fields right away without waiting for a replacement
+      // trailer/video to finish uploading — large files are handed off to the
+      // background upload manager below and attached once done.
       await movieService.updateMovie(id, {
         content_type: values.uploadType === 'series' ? 'series' : 'movie',
         title: values.title,
         description: values.description,
         release_date: `${values.releaseYear}-01-01`,
         base_price: Number(values.price),
+        price_per_episode: values.episodePrice ? Number(values.episodePrice) : undefined,
         language: values.language,
         video_quality: qualityToApi[values.quality] ?? 'hd',
         movie_type: values.accessType[0] ?? 'free',
         keywords: values.keywords.join(','),
         movie_status: values.status === 'publish' ? 'published' : values.status === 'unpublished' ? 'unpublished' : 'draft',
         status: 1,
-        author_ids: [],
-        genre_ids: [],
-        upload_id: movieUploadId,
-        trailer_upload_id: trailerUploadId,
+        author_ids: values.authors,
+        genre_ids: values.genre,
+        seasons: seasonsPayload,
       });
 
       if (files.poster || files.cover) {
@@ -85,7 +110,15 @@ const EditMovie = () => {
         });
       }
 
-      showToast('Movie updated successfully!', 'success');
+      if (files.trailer) startBackgroundUpload(id, 'trailer', files.trailer);
+      if (files.video) startBackgroundUpload(id, 'movie', files.video);
+
+      showToast(
+        files.trailer || files.video
+          ? 'Movie updated — video is uploading in the background, check the Movies list for progress'
+          : 'Movie updated successfully!',
+        'success'
+      );
       navigate('/movies');
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Failed to update movie', 'error');

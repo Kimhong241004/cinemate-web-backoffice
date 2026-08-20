@@ -90,7 +90,17 @@ const SeasonsEpisodes = ({
                         />
                       </div>
 
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <input
+                            type="text"
+                            value={episode.title}
+                            onChange={(e) => onUpdateEpisodeField(season.id, episode.id, 'title', e.target.value)}
+                            placeholder="ចំណងជើងវគ្គ (Episode title) *"
+                            className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-3 py-2 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-xs"
+                          />
+                        </div>
+
                         <div>
                           <button
                             type="button"
@@ -127,6 +137,16 @@ const SeasonsEpisodes = ({
                             className="w-full bg-[#0a0a0a] text-white px-3 py-2 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-xs"
                           />
                         </div>
+
+                        <label className="flex items-center gap-2 text-xs text-[#a1a1aa] md:col-span-2">
+                          <input
+                            type="checkbox"
+                            checked={episode.isFree}
+                            onChange={(e) => onUpdateEpisodeField(season.id, episode.id, 'isFree', e.target.checked)}
+                            className="accent-[#6C5CE7]"
+                          />
+                          Free episode
+                        </label>
                       </div>
 
                       <button

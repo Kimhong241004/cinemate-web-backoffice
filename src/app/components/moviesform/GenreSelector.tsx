@@ -1,32 +1,25 @@
-import { genreOptions } from '../../constants/movieForm';
+import { GenreFromApi } from '../../../api/services/movieService';
+import GenreCombobox from './GenreCombobox';
 
 interface GenreSelectorProps {
+  genres: GenreFromApi[];
   selectedGenres: string[];
   error: string;
-  onToggle: (genre: string) => void;
+  onChange: (genreIds: string[]) => void;
 }
 
-const GenreSelector = ({ selectedGenres, error, onToggle }: GenreSelectorProps) => (
-  <div>
-    <label className="block text-white text-sm font-medium mb-2">
-      បណ្តុំរឿង (Genre) *
-    </label>
-    <div className="flex flex-wrap gap-2 sm:gap-3">
-      {genreOptions.map((genre) => (
-        <button
-          key={genre}
-          type="button"
-          onClick={() => onToggle(genre)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-            selectedGenres.includes(genre) ? 'bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white' : 'bg-[#27272a] text-[#71717a] hover:bg-[#3f3f46]'
-          }`}
-        >
-          {genre}
-        </button>
-      ))}
-    </div>
-    {error && <p className="text-[#ef4444] text-xs mt-1">{error}</p>}
-  </div>
-);
+const GenreSelector = ({ genres, selectedGenres, error, onChange }: GenreSelectorProps) => {
+  const options = genres.map((genre) => genre.name);
+  const value = genres.filter((genre) => selectedGenres.includes(genre.global_id)).map((genre) => genre.name);
+
+  const handleChange = (names: string[]) => {
+    const ids = names
+      .map((name) => genres.find((genre) => genre.name === name)?.global_id)
+      .filter((id): id is string => Boolean(id));
+    onChange(ids);
+  };
+
+  return <GenreCombobox options={options} value={value} onChange={handleChange} error={error} />;
+};
 
 export default GenreSelector;

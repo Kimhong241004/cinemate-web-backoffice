@@ -5,6 +5,7 @@ import DateInput, { type DateRangeValue } from "../shared/DateInput";
 
 export interface PromoCodeFormData {
   code: string;
+  prefix: string;
   quantity: string;
   description: string;
   promoCodeType: string[];
@@ -141,28 +142,30 @@ const PromoCodeFormModal = ({
               )}
             </div>
           ) : (
-            <div>
-              <label className="block text-white text-sm font-medium mb-2">
-                Quantity *
-              </label>
-              <input
-                type="number"
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: e.target.value })
-                }
-                className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
-                  formErrors.quantity ? "border-[#ef4444]" : "border-[#27272a]"
-                } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-                placeholder="10"
-                min="1"
-              />
-              {formErrors.quantity && (
-                <p className="text-[#ef4444] text-xs mt-1">
-                  {formErrors.quantity}
-                </p>
-              )}
-            </div>
+            <>
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Quantity *
+                </label>
+                <input
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: e.target.value })
+                  }
+                  className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
+                    formErrors.quantity ? "border-[#ef4444]" : "border-[#27272a]"
+                  } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
+                  placeholder="10"
+                  min="1"
+                />
+                {formErrors.quantity && (
+                  <p className="text-[#ef4444] text-xs mt-1">
+                    {formErrors.quantity}
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           {/* Description */}

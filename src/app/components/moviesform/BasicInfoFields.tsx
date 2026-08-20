@@ -1,3 +1,5 @@
+import SelectField from './SelectField';
+
 interface BasicInfoFieldsProps {
   title: string;
   releaseYear: string;
@@ -36,20 +38,14 @@ const BasicInfoFields = ({
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-white text-sm font-medium mb-2">
-          ឆ្នាំចេញផ្សាយ (Release Year) *
-        </label>
-        <select
+        <SelectField
+          label="ឆ្នាំចេញផ្សាយ (Release Year) *"
+          placeholder="Select year"
+          options={yearOptions.map(String)}
           value={releaseYear}
-          onChange={(e) => onReleaseYearChange(e.target.value)}
-          className={`w-full bg-[#0a0a0a] text-white px-4 py-2.5 rounded-lg border ${
-            errors.releaseYear ? 'border-[#ef4444]' : 'border-[#27272a]'
-          } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-        >
-          <option value="">Select year</option>
-          {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
-        </select>
-        {errors.releaseYear && <p className="text-[#ef4444] text-xs mt-1">{errors.releaseYear}</p>}
+          onChange={onReleaseYearChange}
+          error={errors.releaseYear}
+        />
       </div>
 
       <div className="sm:col-span-2">

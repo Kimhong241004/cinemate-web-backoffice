@@ -1,12 +1,14 @@
-import { useRef, useState } from 'react';
-import { availableAuthors, defaultMovieFormErrors, defaultMovieFormValues, getYearOptions } from '../constants/movieForm';
+import { useEffect, useRef, useState } from 'react';
+import { defaultMovieFormErrors, defaultMovieFormValues, getYearOptions } from '../constants/movieForm';
 import { Episode, MovieFormFiles, MovieFormValues, Season, SliderImage } from '../../types/movie';
+import { movieService, GenreFromApi } from '../../api/services/movieService';
+import { authorService, AuthorFromApi } from '../../api/services/authorService';
 
 interface UseMovieFormOptions {
   initialValues?: Partial<MovieFormValues>;
   initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
   showToast: (message: string, type: 'success' | 'error') => void;
-  onSubmit: (values: MovieFormValues, files: MovieFormFiles) => void;
+  onSubmit: (values: MovieFormValues, files: MovieFormFiles, seasons: Season[]) => void;
 }
 
 export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubmit }: UseMovieFormOptions) => {
@@ -36,6 +38,14 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
   const [isGeneratingKeywords, setIsGeneratingKeywords] = useState(false);
 
   const [formErrors, setFormErrors] = useState(defaultMovieFormErrors);
+
+  const [genreOptions, setGenreOptions] = useState<GenreFromApi[]>([]);
+  const [authorOptions, setAuthorOptions] = useState<AuthorFromApi[]>([]);
+
+  useEffect(() => {
+    movieService.getGenres({ take: 100 }).then(res => setGenreOptions(res.data)).catch(() => {});
+    authorService.getAuthors({ take: 100 }).then(res => setAuthorOptions(res.data)).catch(() => {});
+  }, []);
 
   const yearOptions = getYearOptions();
 
@@ -124,9 +134,12 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     setIsGeneratingKeywords(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
+      const selectedGenreNames = genreOptions
+        .filter(g => formData.genre.includes(g.global_id))
+        .map(g => g.name.toLowerCase());
       const aiKeywords = [
         formData.title.toLowerCase().split(' ')[0],
-        ...formData.genre.map(g => g.toLowerCase()),
+        ...selectedGenreNames,
         formData.language.toLowerCase(),
         'cinema',
         'movie',
@@ -147,22 +160,18 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     }
   };
 
-  const filteredAuthors = availableAuthors.filter(author =>
+  const filteredAuthors = authorOptions.filter(author =>
     author.name.toLowerCase().includes(authorSearch.toLowerCase())
   );
 
-  const selectedAuthors = availableAuthors.filter(a => formData.authors.includes(a.id));
+  const selectedAuthors = authorOptions.filter(a => formData.authors.includes(a.global_id));
 
-  const toggleGenre = (genre: string) => {
-    if (formData.genre.includes(genre)) {
-      setFormData({ ...formData, genre: formData.genre.filter(g => g !== genre) });
-    } else {
-      setFormData({ ...formData, genre: [...formData.genre, genre] });
-    }
+  const setGenre = (genreIds: string[]) => {
+    setFormData({ ...formData, genre: genreIds });
     setFormErrors({ ...formErrors, genre: '' });
   };
 
-  const toggleAuthor = (authorId: number) => {
+  const toggleAuthor = (authorId: string) => {
     if (formData.authors.includes(authorId)) {
       setFormData({ ...formData, authors: formData.authors.filter(id => id !== authorId) });
     } else {
@@ -170,7 +179,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     }
   };
 
-  const selectAuthor = (authorId: number) => {
+  const selectAuthor = (authorId: string) => {
     toggleAuthor(authorId);
     setAuthorSearch('');
     setShowAuthorDropdown(false);
@@ -190,6 +199,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
       if (season.id === seasonId) {
         const newEpisode: Episode = {
           id: Date.now(), episodeNumber: season.episodes.length + 1,
+          title: '', isFree: false,
           thumbnail: null, thumbnailPreview: '', platform: '', releaseDate: '',
           videoFile: null, videoPreview: '', uploadProgress: 0,
         };
@@ -314,7 +324,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
       showToast('Please fix all errors before submitting', 'error');
       return;
     }
-    onSubmit(formData, files);
+    onSubmit(formData, files, seasons);
   };
 
   return {
@@ -330,6 +340,8 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     isGeneratingKeywords,
     formErrors,
     yearOptions,
+    genreOptions,
+    authorOptions,
     filteredAuthors,
     selectedAuthors,
     handleImageChange,
@@ -342,7 +354,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     handleRemoveKeyword,
     handleKeywordKeyPress,
     handleGenerateKeywords,
-    toggleGenre,
+    setGenre,
     toggleAuthor,
     selectAuthor,
     addSeason,

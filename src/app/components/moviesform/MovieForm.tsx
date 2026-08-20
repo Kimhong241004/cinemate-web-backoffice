@@ -105,9 +105,10 @@ const MovieForm = ({
         />
 
         <GenreSelector
+          genres={form.genreOptions}
           selectedGenres={form.formData.genre}
           error={form.formErrors.genre}
-          onToggle={form.toggleGenre}
+          onChange={form.setGenre}
         />
 
         <LanguageQualityFields
@@ -196,14 +197,7 @@ const MovieForm = ({
 
         <AccessTypeSelector
           accessType={form.formData.accessType}
-          freeEpisodeCount={form.formData.freeEpisodeCount}
-          onToggle={(type) => form.setFormData({
-            ...form.formData,
-            accessType: form.formData.accessType.includes(type)
-              ? form.formData.accessType.filter((a) => a !== type)
-              : [...form.formData.accessType, type],
-          })}
-          onFreeEpisodeCountChange={(freeEpisodeCount) => form.setFormData({ ...form.formData, freeEpisodeCount })}
+          onToggle={(type) => form.setFormData({ ...form.formData, accessType: [type] })}
         />
 
         <StatusSelector

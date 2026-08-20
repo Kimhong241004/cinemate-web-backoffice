@@ -51,9 +51,11 @@ export interface MovieFromApi {
   global_id: string;
   content_type: 'movie' | 'series';
   title: string;
+  total_episodes?: number;
   description: string;
   release_date: string;
   base_price: number;
+  price_per_episode?: number;
   language: string;
   country: string;
   video_quality: 'hd' | 'full_hd' | 'four_k' | string;
@@ -183,6 +185,14 @@ export interface UploadStatus {
   ref_id?: number;
 }
 
+export interface LockEpisodesData {
+  /** Locks/unlocks every episode within these seasons */
+  season_global_ids?: string[];
+  /** Locks/unlocks these specific episodes */
+  episode_global_ids?: string[];
+  is_locked: boolean;
+}
+
 export const movieService = {
   getMovies: (params?: GetMoviesParams) => {
     const query: Record<string, string> = {};
@@ -246,9 +256,22 @@ export const movieService = {
     return apiClient<UploadStatus>(`/v1/movies/uploads/${uploadGlobalId}/status`);
   },
 
+  abortUpload: (uploadGlobalId: string) => {
+    return apiClient<void>(`/v1/movies/uploads/${uploadGlobalId}`, { method: 'DELETE' });
+  },
+
+  lockEpisodes: (data: LockEpisodesData) => {
+    return apiClient<void>('/v1/movies/episodes/lock', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   // Chunks `file` per the init session, PUTs each part to storage, completes the
   // upload, and returns the upload_global_id for use as upload_id/trailer_upload_id.
-  uploadFileInChunks: async (target: UploadTarget, file: File): Promise<string> => {
+  // onProgress reports 0-100 based on parts completed (uploading phase only —
+  // it does not track server-side conversion, which happens after completeUpload).
+  uploadFileInChunks: async (target: UploadTarget, file: File, onProgress?: (pct: number) => void): Promise<string> => {
     const session = await movieService.initUpload(target, {
       file_size: file.size,
       file_name: file.name,
@@ -256,6 +279,7 @@ export const movieService = {
     });
 
     const parts: CompleteUploadPart[] = [];
+    onProgress?.(0);
     for (const part of session.parts) {
       const start = (part.part_number - 1) * session.chunk_size;
       const chunk = file.slice(start, start + session.chunk_size);
@@ -268,6 +292,7 @@ export const movieService = {
         throw new Error(`Storage did not return an ETag for part ${part.part_number} (check CORS Access-Control-Expose-Headers)`);
       }
       parts.push({ part_number: part.part_number, etag });
+      onProgress?.(Math.round((parts.length / session.total_parts) * 100));
     }
 
     await movieService.completeUpload(session.upload_global_id, parts);
