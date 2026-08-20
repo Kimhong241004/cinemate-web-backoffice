@@ -17,6 +17,24 @@ const GUEST_USER: TransactionUser = { global_id: '', name: '', user_type: 'guest
 const formatAmount = (n: number) =>
   `${new Intl.NumberFormat('en-US').format(n)} ៛`;
 
+const normalizeUser = (user: TransactionUser | null | undefined): TransactionUser =>
+  user
+    ? { ...user, name: user.name ?? '', contact: user.contact ?? '' }
+    : GUEST_USER;
+
+const PURCHASE_TYPE_STYLES: Record<string, { label: string; cls: string }> = {
+  movie: { label: 'Movie', cls: 'bg-[#3b82f6]/20 text-[#3b82f6]' },
+  topup: { label: 'Top Up', cls: 'bg-[#22c55e]/20 text-[#22c55e]' },
+  plan:  { label: 'Plan',  cls: 'bg-[#a855f7]/20 text-[#a855f7]' },
+};
+
+const getPurchaseTypeInfo = (purchaseType: string) => {
+  const q = purchaseType.toLowerCase();
+  if (q.includes('movie')) return PURCHASE_TYPE_STYLES.movie;
+  if (q.includes('top')) return PURCHASE_TYPE_STYLES.topup;
+  return PURCHASE_TYPE_STYLES.plan;
+};
+
 const StatusChip = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; cls: string }> = {
     pending:    { label: 'Pending',    cls: 'bg-[#f59e0b]/20 text-[#f59e0b]' },
@@ -60,7 +78,6 @@ const Transactions = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [viewTx, setViewTx] = useState<TransactionFromApi | null>(null);
-  const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -76,7 +93,7 @@ const Transactions = () => {
         payment_status: (selectedStatus || undefined) as GetTransactionsFilters['payment_status'],
         type: (selectedType || undefined) as GetTransactionsFilters['type'],
       });
-      setTransactions(res.data.map((tx) => ({ ...tx, user: tx.user ?? GUEST_USER })));
+      setTransactions(res.data.map((tx) => ({ ...tx, user: normalizeUser(tx.user) })));
       setSummary(res.summary);
       setTotal(res.total);
     } catch {
@@ -89,24 +106,6 @@ const Transactions = () => {
   useEffect(() => {
     fetchTransactions(currentPage);
   }, [currentPage, selectedStatus, selectedType]);
-
-  const handleRefreshRow = async (tx: TransactionFromApi) => {
-    setRefreshingId(tx.global_id);
-    try {
-      const skip = (currentPage - 1) * TAKE;
-      const res = await transactionService.getTransactions(skip, TAKE, {
-        payment_status: (selectedStatus || undefined) as GetTransactionsFilters['payment_status'],
-        type: (selectedType || undefined) as GetTransactionsFilters['type'],
-      });
-      setTransactions(res.data.map((t) => ({ ...t, user: t.user ?? GUEST_USER })));
-      setSummary(res.summary);
-      setTotal(res.total);
-    } catch {
-      showToast('Failed to refresh transaction', 'error');
-    } finally {
-      setRefreshingId(null);
-    }
-  };
 
   const handleStatusSelect = (value: string) => {
     setSelectedStatus(value);
@@ -263,14 +262,8 @@ const Transactions = () => {
                     </div>
                   </Td>
                   <Td>
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      tx.purchase_type === 'ticket'
-                        ? 'bg-[#3b82f6]/20 text-[#3b82f6]'
-                        : tx.purchase_type === 'product'
-                        ? 'bg-[#22c55e]/20 text-[#22c55e]'
-                        : 'bg-[#a855f7]/20 text-[#a855f7]'
-                    }`}>
-                      {tx.purchase_type === 'ticket' ? 'Movie' : tx.purchase_type === 'product' ? 'Product' : 'Plan'}
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPurchaseTypeInfo(tx.purchase_type).cls}`}>
+                      {getPurchaseTypeInfo(tx.purchase_type).label}
                     </span>
                   </Td>
                   <Td className="max-w-[140px]">
@@ -301,14 +294,6 @@ const Transactions = () => {
                         title="View"
                       >
                         <Eye className="w-4 h-4 text-[#6C5CE7]" />
-                      </button>
-                      <button
-                        onClick={() => handleRefreshRow(tx)}
-                        disabled={refreshingId === tx.global_id}
-                        className="p-2 rounded-lg hover:bg-[#27272a] transition-colors disabled:opacity-50"
-                        title="Refresh"
-                      >
-                        <RefreshCw className={`w-4 h-4 text-[#22c55e] ${refreshingId === tx.global_id ? 'animate-spin' : ''}`} />
                       </button>
                     </div>
                   </Td>

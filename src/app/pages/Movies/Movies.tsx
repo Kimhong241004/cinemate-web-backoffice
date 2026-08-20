@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Search, Plus, Eye, Edit, Trash2, X, Film, Star, Play, Clock, EyeOff } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useUploadManager, BackgroundUpload } from '../../context/UploadManagerContext';
 import { movieService, MovieFromApi, GenreFromApi } from '../../../api/services/movieService';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import Pagination from '../../components/shared/Pagination';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
 import { TableContainer, TableHead, Th, TableBody, TableRow, Td } from '../../components/shared/Table/Table';
+import { getVideoStatusDisplay } from '../../utils/videoStatus';
 
 const TAKE = 10;
 
@@ -23,19 +25,6 @@ const formatDuration = (min: number | null) => {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
-};
-
-// Video phases: uploading (blue) → converting (amber) → completed (green dot)
-type VideoPhase = 'uploading' | 'converting';
-const phaseConfig: Record<VideoPhase, { bar: string; track: string; text: string; label: string }> = {
-  uploading:  { bar: 'bg-[#3b82f6]', track: 'bg-[#3b82f6]/20', text: 'text-[#3b82f6]', label: 'Uploading'  },
-  converting: { bar: 'bg-[#f59e0b]', track: 'bg-[#f59e0b]/20', text: 'text-[#f59e0b]', label: 'Converting' },
-};
-
-// Demo progress per absolute row index (rows not listed fall back to source status)
-const progressByRow: Record<number, { phase: VideoPhase; pct: number }> = {
-  0: { phase: 'converting', pct: 50 },  // row #1 → Converting
-  2: { phase: 'uploading',  pct: 25 },  // row #3 → Uploading
 };
 
 // ── badge colour maps ────────────────────────────────────────────────────────
@@ -57,11 +46,15 @@ const statusStyles: Record<string, string> = {
   unpublished: 'bg-[#ef4444]/20 text-[#ef4444]',
 };
 
-const videoStatusConfig: Record<string, { dot: string; label: string }> = {
-  completed:  { dot: 'bg-[#22c55e]', label: 'Completed'  },
-  failed:     { dot: 'bg-[#ef4444]', label: 'Failed'     },
-  processing: { dot: 'bg-[#eab308]', label: 'Processing' },
-  pending:    { dot: 'bg-[#71717a]', label: 'Pending'     },
+// Background-upload phases shown on a row while a large trailer/movie file is
+// still being sent to storage (before the movie's own convert_status kicks in).
+const uploadPhaseLabel: Record<BackgroundUpload['status'], string> = {
+  uploading:  'Uploading',
+  finalizing: 'Finalizing',
+  attaching:  'Attaching',
+  converting: 'Converting',
+  completed:  'Completed',
+  error:      'Upload failed',
 };
 
 const Badge = ({ label, cls }: { label: string; cls: string }) => (
@@ -75,6 +68,7 @@ const Movies = () => {
   const navigate = useNavigate();
   const { showToast, addNotification } = useNotification();
   const { t } = useLanguage();
+  const { uploads, getUploadsForMovie, dismissUpload } = useUploadManager();
 
   const [searchQuery, setSearchQuery]         = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -121,6 +115,8 @@ const Movies = () => {
         movie_status: movieStatus,
         genre: selectedGenre || undefined,
       });
+      // TEMP DEBUG — remove once we've confirmed whether the list response includes sources[]
+      console.log('[Movies debug] ' + JSON.stringify(res.data.map((m) => ({ title: m.title, sources: m.sources })), null, 2));
       setMovies(res.data);
       setTotal(res.total);
     } catch {
@@ -131,6 +127,38 @@ const Movies = () => {
   }, [currentPage, debouncedSearch, selectedType, selectedStatus, selectedGenre, showToast]);
 
   useEffect(() => { fetchMovies(); }, [fetchMovies]);
+
+  // When a background upload for a movie on this page fails, surface the error
+  // and drop it from the row immediately.
+  useEffect(() => {
+    const errored = uploads.filter((u) => u.status === 'error');
+    if (errored.length === 0) return;
+    errored.forEach((u) => {
+      showToast(`Upload failed for ${u.fileName}: ${u.error}`, 'error');
+      dismissUpload(u.id);
+    });
+    fetchMovies();
+  }, [uploads, dismissUpload, fetchMovies, showToast]);
+
+  // When a background upload completes, refresh the list so the real convert_status
+  // is fetched, but keep the "Completed" row visible for a moment before dismissing it —
+  // otherwise it flips from "Converting" straight to gone/refetched and the admin never
+  // sees confirmation the upload actually finished. The scheduled-ids ref keeps this from
+  // re-arming the timer every time an unrelated upload's progress ticks (uploads is a new
+  // array reference on every progress update).
+  const scheduledDismissRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const completed = uploads.filter((u) => u.status === 'completed' && !scheduledDismissRef.current.has(u.id));
+    if (completed.length === 0) return;
+    completed.forEach((u) => scheduledDismissRef.current.add(u.id));
+    fetchMovies();
+    completed.forEach((u) => {
+      setTimeout(() => {
+        dismissUpload(u.id);
+        scheduledDismissRef.current.delete(u.id);
+      }, 2500);
+    });
+  }, [uploads, dismissUpload, fetchMovies]);
 
   useEffect(() => {
     movieService.getGenres({ take: 100 }).then((res) => setGenres(res.data)).catch(() => {});
@@ -325,8 +353,14 @@ const Movies = () => {
             displayedMovies.map((movie, index) => {
               const ql         = qualityLabel(movie.video_quality);
               const src0       = movie.sources?.[0];
-              const vidStatus  = src0 ? videoStatusConfig[src0.convert_status] : null;
+              const vidStatus  = getVideoStatusDisplay(src0?.convert_status);
               const accessType = movie.movie_type?.toLowerCase() ?? 'free';
+              const movieUploads     = getUploadsForMovie(movie.global_id);
+              const activeUpload     = movieUploads.find((u) => u.target === 'movie' && u.status !== 'error')
+                ?? movieUploads.find((u) => u.target === 'trailer' && u.status !== 'error');
+              const convertingStatus = activeUpload?.status === 'converting'
+                ? getVideoStatusDisplay(activeUpload.convertStatus) ?? { dot: 'bg-[#eab308]', label: 'Converting' }
+                : null;
 
               return (
                 <TableRow key={movie.global_id}>
@@ -413,21 +447,29 @@ const Movies = () => {
 
                   {/* Video */}
                   <Td>
-                    {progressByRow[(currentPage - 1) * TAKE + index] !== undefined ? (() => {
-                      const { phase, pct } = progressByRow[(currentPage - 1) * TAKE + index];
-                      const c = phaseConfig[phase];
-                      return (
-                        <div className="w-32">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`${c.text} text-xs font-medium`}>{c.label}</span>
-                            <span className={`${c.text} text-xs font-semibold`}>{pct}%</span>
-                          </div>
-                          <div className={`w-full h-2 ${c.track} rounded-full overflow-hidden`}>
-                            <div className={`h-full ${c.bar} rounded-full`} style={{ width: `${pct}%` }} />
-                          </div>
+                    {convertingStatus ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                        <span className={`w-1.5 h-1.5 rounded-full ${convertingStatus.dot} animate-pulse`} />
+                        <span className="text-[#a1a1aa]">{convertingStatus.label}</span>
+                      </span>
+                    ) : activeUpload ? (
+                      <div className="w-32">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-medium ${activeUpload.status === 'completed' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                            {uploadPhaseLabel[activeUpload.status]}
+                          </span>
+                          <span className={`text-xs font-semibold ${activeUpload.status === 'completed' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                            {Math.min(activeUpload.progress, 100)}%
+                          </span>
                         </div>
-                      );
-                    })() : vidStatus ? (
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${activeUpload.status === 'completed' ? 'bg-[#22c55e]/20' : 'bg-[#3b82f6]/20'}`}>
+                          <div
+                            className={`h-full rounded-full transition-all ${activeUpload.status === 'completed' ? 'bg-[#22c55e]' : 'bg-[#3b82f6]'}`}
+                            style={{ width: `${Math.min(activeUpload.progress, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : vidStatus ? (
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium">
                         <span className={`w-1.5 h-1.5 rounded-full ${vidStatus.dot}`} />
                         <span className="text-[#a1a1aa]">{vidStatus.label}</span>

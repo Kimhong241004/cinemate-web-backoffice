@@ -8,12 +8,10 @@ const accessTypeOptions: { value: AccessType; label: string }[] = [
 
 interface AccessTypeSelectorProps {
   accessType: AccessType[];
-  freeEpisodeCount: string;
   onToggle: (type: AccessType) => void;
-  onFreeEpisodeCountChange: (value: string) => void;
 }
 
-const AccessTypeSelector = ({ accessType, freeEpisodeCount, onToggle, onFreeEpisodeCountChange }: AccessTypeSelectorProps) => (
+const AccessTypeSelector = ({ accessType, onToggle }: AccessTypeSelectorProps) => (
   <div>
     <label className="block text-white text-sm font-medium mb-2">
       ប្រភេទចូលប្រើ (Access Type) *
@@ -32,23 +30,6 @@ const AccessTypeSelector = ({ accessType, freeEpisodeCount, onToggle, onFreeEpis
         </button>
       ))}
     </div>
-
-    {accessType.includes('free') && (
-      <div className="mt-3 max-w-xs">
-        <label className="block text-white text-sm font-medium mb-2">
-          ចំនួនភាគឥតគិតថ្លៃ (Free Episodes)
-        </label>
-        <input
-          type="number"
-          value={freeEpisodeCount}
-          onChange={(e) => onFreeEpisodeCountChange(e.target.value)}
-          className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
-          placeholder="e.g. 3"
-          min="0"
-        />
-        <p className="text-[#71717a] text-xs mt-1">Number of first episodes that are free to watch</p>
-      </div>
-    )}
   </div>
 );
 

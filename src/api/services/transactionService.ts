@@ -2,9 +2,9 @@ import { apiClient } from '../clients/apiClient';
 
 export interface TransactionUser {
   global_id: string;
-  name: string;
+  name: string | null;
   user_type: string;
-  contact: string;
+  contact: string | null;
   profile_url: string | null;
 }
 

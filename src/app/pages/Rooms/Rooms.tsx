@@ -11,13 +11,23 @@ import { roomService, type RoomFromApi, type RoomStatus, type RoomDetail } from 
 const ITEMS_PER_PAGE = 10;
 
 const statusConfig: Record<RoomStatus, { label: string; color: string }> = {
-  active:   { label: 'Active',   color: 'bg-green-500/10 text-green-500 border border-green-500/20' },
-  inactive: { label: 'Inactive', color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' },
-  deleted: { label: 'Deleted', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  active:      { label: 'Active',      color: 'bg-green-500/10 text-green-500 border border-green-500/20' },
+  inactive:    { label: 'Inactive',    color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' },
+  deactivated: { label: 'Deactivated', color: 'bg-red-500/10 text-red-400 border border-red-500/20' },
+  deleted:     { label: 'Deleted',     color: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
 };
 
 const UNKNOWN_STATUS = { label: 'Unknown', color: 'bg-[#71717a]/10 text-[#71717a] border border-[#71717a]/20' };
 const getStatusConfig = (status: RoomStatus) => statusConfig[status] ?? UNKNOWN_STATUS;
+
+// Single source of truth for a room's displayed status, so the table/modal badge,
+// the stat counts, and the activate/deactivate menu all agree with each other.
+// status and room_status are independent — a room can be enabled (status: 1) but idle
+// (room_status: 'inactive'), so "Active" requires both fields to agree.
+const getDisplayStatus = (room: RoomFromApi): RoomStatus => {
+  if (room.room_status === 'deleted' || room.room_status === 'deactivated') return room.room_status;
+  return room.room_status === 'active' && room.status === 1 ? 'active' : 'inactive';
+};
 
 const formatPrice = (n: number) => `${new Intl.NumberFormat('en-US').format(n)} ៛`;
 
@@ -29,18 +39,25 @@ export default function Rooms() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rooms, setRooms] = useState<RoomFromApi[]>([]);
   const [total, setTotal] = useState(0);
+  const [activeTotal, setActiveTotal] = useState(0);
+  const [inactiveTotal, setInactiveTotal] = useState(0);
+  const [totalParticipants, setTotalParticipants] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<RoomFromApi | null>(null);
   const [roomDetail, setRoomDetail] = useState<RoomDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [modalTab, setModalTab] = useState<'info' | 'contents' | 'participants'>('info');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [disableRoomTarget, setDisableRoomTarget] = useState<RoomFromApi | null>(null);
+  const [deactivateRoomTarget, setDeactivateRoomTarget] = useState<RoomFromApi | null>(null);
   const [activateRoomTarget, setActivateRoomTarget] = useState<RoomFromApi | null>(null);
   const [isActioning, setIsActioning] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = () => setOpenMenuId(null);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-room-menu]')) {
+        setOpenMenuId(null);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -52,6 +69,9 @@ export default function Rooms() {
         skip: (currentPage - 1) * ITEMS_PER_PAGE,
         take: ITEMS_PER_PAGE,
         room_status: statusFilter || undefined,
+        // API only matches enabled/disabled rooms when `status` is sent alongside room_status:
+        // 0 = deactivated (disabled), 1 = activated-but-idle (inactive)
+        status: statusFilter === 'deactivated' ? 0 : statusFilter === 'inactive' ? 1 : undefined,
       });
       setRooms(res.data);
       setTotal(res.total);
@@ -66,6 +86,47 @@ export default function Rooms() {
     fetchRooms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, statusFilter]);
+
+  // Active/Inactive counts must reflect the whole dataset, not just the current page,
+  // so they're fetched separately via the API's own filtered `total` — take:1 is enough
+  // since only `total` is used, not the returned rows.
+  const fetchStats = async () => {
+    try {
+      const [activeRes, inactiveRes] = await Promise.all([
+        roomService.getRooms({ room_status: 'active', take: 1 }),
+        roomService.getRooms({ room_status: 'inactive', take: 1 }),
+      ]);
+      setActiveTotal(activeRes.total);
+      setInactiveTotal(inactiveRes.total);
+    } catch {
+      // stats are supplementary; leave previous values on failure
+    }
+  };
+
+  // No aggregate endpoint exists for participants, so page through every room
+  // (take maxes at 100) and sum current_participants across the whole dataset.
+  const fetchTotalParticipants = async () => {
+    try {
+      let skip = 0;
+      let sum = 0;
+      let grandTotal = Infinity;
+      const take = 100;
+      while (skip < grandTotal && skip < 5000) {
+        const res = await roomService.getRooms({ skip, take });
+        grandTotal = res.total;
+        sum += res.data.reduce((s, r) => s + r.current_participants, 0);
+        skip += take;
+      }
+      setTotalParticipants(sum);
+    } catch {
+      // stats are supplementary; leave previous value on failure
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    fetchTotalParticipants();
+  }, []);
 
   useEffect(() => {
     if (!selectedRoom) {
@@ -83,6 +144,7 @@ export default function Rooms() {
   // GET /v1/rooms doesn't document a search param, so filter by room name/ID
   // client-side — this only narrows the rooms already fetched for the current page.
   const filteredRooms = rooms.filter((room) => {
+    if (getDisplayStatus(room) === 'deleted') return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return room.room_name.toLowerCase().includes(q) || room.global_id.toLowerCase().includes(q);
@@ -90,16 +152,17 @@ export default function Rooms() {
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const handleDisableRoom = async () => {
-    if (!disableRoomTarget) return;
+  const handleDeactivateRoom = async () => {
+    if (!deactivateRoomTarget) return;
     setIsActioning(true);
     try {
-      await roomService.disableRoom(disableRoomTarget.global_id);
-      showToast('Room disabled', 'success');
-      setDisableRoomTarget(null);
+      await roomService.deactivateRoom(deactivateRoomTarget.global_id);
+      showToast('Room deactivated', 'success');
+      setDeactivateRoomTarget(null);
       fetchRooms();
+      fetchStats();
     } catch {
-      showToast('Failed to disable room', 'error');
+      showToast('Failed to deactivate room', 'error');
     } finally {
       setIsActioning(false);
     }
@@ -113,6 +176,7 @@ export default function Rooms() {
       showToast('Room activated', 'success');
       setActivateRoomTarget(null);
       fetchRooms();
+      fetchStats();
     } catch {
       showToast('Failed to activate room', 'error');
     } finally {
@@ -131,10 +195,10 @@ export default function Rooms() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: t.rooms.totalRooms,        value: total,                                                  icon: Users2, color: 'text-[#3b82f6]' },
-          { label: t.rooms.activeNow,         value: rooms.filter(r => r.room_status === 'active').length,   icon: Film,   color: 'text-[#22c55e]' },
-          { label: t.rooms.deletedToday,      value: rooms.filter(r => r.room_status === 'deleted').length,  icon: Film,   color: 'text-[#f59e0b]' },
-          { label: t.rooms.totalParticipants, value: rooms.reduce((sum, r) => sum + r.current_participants, 0), icon: Users2, color: 'text-[#a855f7]' },
+          { label: t.rooms.totalRooms,        value: total,        icon: Users2, color: 'text-[#3b82f6]' },
+          { label: t.rooms.activeNow,         value: activeTotal,  icon: Film,   color: 'text-[#22c55e]' },
+          { label: t.rooms.deactivatedToday,  value: inactiveTotal, icon: Film,  color: 'text-[#f59e0b]' },
+          { label: t.rooms.totalParticipants, value: totalParticipants, icon: Users2, color: 'text-[#a855f7]' },
         ].map((stat, i) => (
           <div key={i} className="bg-[#18181b] border border-[#27272a] rounded-2xl p-4">
             <p className="text-[#71717a] text-xs mb-1">{stat.label}</p>
@@ -164,7 +228,7 @@ export default function Rooms() {
           options={[
             { value: 'active', label: t.rooms.status.active },
             { value: 'inactive', label: t.rooms.status.inactive },
-            { value: 'deleted', label: t.rooms.status.deleted },
+            { value: 'deactivated', label: t.rooms.status.deactivated },
           ]}
         />
       </div>
@@ -203,8 +267,8 @@ export default function Rooms() {
                   {new Date(room.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </Td>
                 <Td>
-                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusConfig(room.room_status).color}`}>
-                    {getStatusConfig(room.room_status).label}
+                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusConfig(getDisplayStatus(room)).color}`}>
+                    {getStatusConfig(getDisplayStatus(room)).label}
                   </span>
                 </Td>
                 <Td>
@@ -215,7 +279,7 @@ export default function Rooms() {
                     >
                       <Eye className="w-4 h-4 text-[#6C5CE7]" />
                     </button>
-                    <div className="relative">
+                    <div className="relative" data-room-menu>
                       <button
                         onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === room.global_id ? null : room.global_id); }}
                         className="p-2 rounded-lg hover:bg-[#27272a] transition-colors"
@@ -224,7 +288,7 @@ export default function Rooms() {
                       </button>
                       {openMenuId === room.global_id && (
                         <div className="absolute right-0 mt-1 w-44 bg-[#18181b] border border-[#27272a] rounded-lg shadow-xl z-20 overflow-hidden">
-                          {room.room_status === 'inactive' ? (
+                          {room.status === 0 ? (
                             <button
                               onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setActivateRoomTarget(room); }}
                               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#22c55e] hover:bg-[#27272a] transition-colors"
@@ -234,11 +298,11 @@ export default function Rooms() {
                             </button>
                           ) : (
                             <button
-                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setDisableRoomTarget(room); }}
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setDeactivateRoomTarget(room); }}
                               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-[#ef4444] hover:bg-[#27272a] transition-colors"
                             >
                               <Ban className="w-4 h-4" />
-                              Disable Room
+                              Deactivate Room
                             </button>
                           )}
                         </div>
@@ -258,6 +322,7 @@ export default function Rooms() {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          summary={<>Showing {total > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} to {Math.min(currentPage * ITEMS_PER_PAGE, total)} of {total} entries</>}
         />
       )}
 
@@ -299,7 +364,7 @@ export default function Rooms() {
                   {[
                     { label: t.rooms.modal.roomId, value: selectedRoom.global_id, mono: true },
                     { label: t.rooms.modal.host, value: (roomDetail ?? selectedRoom).host?.name || (roomDetail ?? selectedRoom).host?.username || '-', mono: false },
-                    { label: 'Status', value: getStatusConfig(selectedRoom.room_status).label, mono: false },
+                    { label: 'Status', value: getStatusConfig(getDisplayStatus(selectedRoom)).label, mono: false },
                     { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString(), mono: false },
                   ].map((item) => (
                     <div key={item.label} className={item.mono ? 'col-span-2' : undefined}>
@@ -340,7 +405,7 @@ export default function Rooms() {
                       <tr className="border-t border-[#27272a]">
                         <td colSpan={2} className="px-3 py-2.5 text-[#71717a] text-xs font-bold uppercase">Total per new member</td>
                         <td className="px-3 py-2.5 text-right text-white font-bold">
-                          {formatPrice((roomDetail?.movies ?? []).reduce((sum, m) => sum + m.base_price, 0))}
+                          {formatPrice((roomDetail?.movies ?? []).reduce((sum, m) => sum + Number(m.base_price), 0))}
                         </td>
                       </tr>
                     </tfoot>
@@ -383,14 +448,14 @@ export default function Rooms() {
       )}
 
       <ConfirmDialog
-        isOpen={!!disableRoomTarget}
-        title="Disable Room"
-        message={`Are you sure you want to disable "${disableRoomTarget?.room_name}"? This room will no longer be accessible.`}
-        confirmLabel="Disable"
+        isOpen={!!deactivateRoomTarget}
+        title="Deactivate Room"
+        message={`Are you sure you want to deactivate "${deactivateRoomTarget?.room_name}"? This room will no longer be accessible.`}
+        confirmLabel="Deactivate"
         variant="danger"
         loading={isActioning}
-        onConfirm={handleDisableRoom}
-        onCancel={() => setDisableRoomTarget(null)}
+        onConfirm={handleDeactivateRoom}
+        onCancel={() => setDeactivateRoomTarget(null)}
       />
 
       <ConfirmDialog

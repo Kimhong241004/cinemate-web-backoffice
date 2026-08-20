@@ -32,7 +32,7 @@ export interface GetUsersParams {
   page?: number;
   take?: number;
   search?: string;
-  user_type?: 'regular' | 'creator';
+  user_type?: 'regular' | 'creator' | 'guest';
 }
 
 export const userService = {

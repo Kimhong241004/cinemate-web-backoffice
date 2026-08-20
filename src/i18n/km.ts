@@ -451,7 +451,7 @@ export const km = {
     searchPlaceholder: '',
     totalRooms: '',
     activeRooms: '',
-    deletedToday: 'បានលុបថ្ងៃនេះ',
+    deactivatedToday: 'អសកម្ម',
     totalPArticipants: '',
     table: {
       no: '',

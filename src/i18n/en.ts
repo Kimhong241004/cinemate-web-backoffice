@@ -452,7 +452,7 @@ export const en = {
     searchPlaceholder: 'Search by room ID or name ',
     totalRooms: 'Total Rooms',
     activeNow: 'Active Now',
-    deletedToday: 'Deleted Today',
+    deactivatedToday: 'Inactive',
     totalParticipants: 'Total Participants',
     table: {
       no: 'NO.',
@@ -469,6 +469,7 @@ export const en = {
     status: {
       active: 'Active',
       inactive: 'Inactive',
+      deactivated: 'Deactivated',
       deleted: 'Deleted',
     },
     modal: {

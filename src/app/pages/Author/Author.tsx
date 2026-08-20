@@ -484,7 +484,7 @@ const Author = () => {
         }
         confirmLabel={editingAuthor ? t.author.editAuthor : t.author.addAuthor}
         cancelLabel={t.author.cancel}
-        variant="warning"
+        variant="brand"
         loading={isSubmitting}
         onConfirm={handleSubmit}
         onCancel={() => setShowSubmitConfirm(false)}

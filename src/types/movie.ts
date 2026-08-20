@@ -7,11 +7,10 @@ export interface MovieFormValues {
   description: string;
   keywords: string[];
   accessType: ('buy' | 'membership' | 'free')[];
-  freeEpisodeCount: string;
   uploadType: 'full' | 'series';
   price: string;
   episodePrice: string;
-  authors: number[];
+  authors: string[];
   status: 'draft' | 'publish' | 'unpublished';
 }
 
@@ -48,15 +47,11 @@ export interface SliderImage {
   file: File | null;
 }
 
-export interface Author {
-  id: number;
-  name: string;
-  profile: string;
-}
-
 export interface Episode {
   id: number;
   episodeNumber: number;
+  title: string;
+  isFree: boolean;
   thumbnail: File | null;
   thumbnailPreview: string;
   platform: string;
@@ -81,6 +76,6 @@ export interface MovieFormProps {
   initialValues?: Partial<MovieFormValues>;
   initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
   onCancel: () => void;
-  onSubmit: (values: MovieFormValues, files: MovieFormFiles) => void;
+  onSubmit: (values: MovieFormValues, files: MovieFormFiles, seasons: Season[]) => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 }
