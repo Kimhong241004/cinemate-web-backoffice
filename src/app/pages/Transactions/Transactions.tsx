@@ -326,10 +326,19 @@ const Transactions = () => {
 
             {/* User */}
             <div className="flex items-center gap-3 mb-5 p-4 bg-[#27272a] rounded-xl">
-              <UserAvatar src={viewTx.user.profile_url} name={viewTx.user.name} size={10} />
+              <UserAvatar src={viewTx.user.profile_url} name={viewTx.user.user_type === 'guest' ? 'G' : viewTx.user.name} size={10} />
               <div>
-                <p className="text-white font-semibold">{viewTx.user.name}</p>
-                <p className="text-[#71717a] text-xs">{viewTx.user.contact}</p>
+                {viewTx.user.user_type === 'guest' ? (
+                  <>
+                    <p className="text-white font-semibold">Guest</p>
+                    <p className="text-[#71717a] text-xs font-mono break-all">{viewTx.user.global_id}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white font-semibold">{viewTx.user.name}</p>
+                    <p className="text-[#71717a] text-xs">{viewTx.user.contact}</p>
+                  </>
+                )}
                 <p className="text-[#52525b] text-xs capitalize">{viewTx.user.user_type}</p>
               </div>
             </div>
