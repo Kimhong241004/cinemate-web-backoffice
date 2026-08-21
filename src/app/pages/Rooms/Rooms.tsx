@@ -206,9 +206,27 @@ export default function Rooms() {
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const handleCopyRoomId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    showToast('Room ID copied to clipboard', 'success');
+  const handleCopyRoomId = async (id: string) => {
+    try {
+      // navigator.clipboard requires a secure context (HTTPS or localhost) — on a
+      // plain-HTTP host it's unavailable, so fall back to the legacy copy command.
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(id);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = id;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      showToast('Room ID copied to clipboard', 'success');
+    } catch {
+      showToast('Failed to copy Room ID', 'error');
+    }
   };
 
   const handleDeactivateRoom = async () => {
