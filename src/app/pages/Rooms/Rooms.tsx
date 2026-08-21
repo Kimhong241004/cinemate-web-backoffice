@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
-import { Users2, Film, X, Eye, Search, MoreHorizontal, Ban, CheckCircle } from 'lucide-react';
+import { Users2, Film, X, Eye, Search, MoreHorizontal, Ban, CheckCircle, Copy } from 'lucide-react';
 import Pagination from '../../components/shared/Pagination';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
@@ -35,6 +35,7 @@ export default function Rooms() {
   const { t } = useLanguage();
   const { showToast } = useNotification();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RoomStatus | ''>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [rooms, setRooms] = useState<RoomFromApi[]>([]);
@@ -62,19 +63,72 @@ export default function Rooms() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const NON_DELETED_STATUSES: RoomStatus[] = ['active', 'inactive', 'deactivated'];
+
+  // API only matches enabled/disabled rooms when `status` is sent alongside room_status:
+  // 0 = deactivated (disabled), 1 = activated-but-idle (inactive), undefined for active.
+  const statusParamsFor = (status: RoomStatus | '') => ({
+    room_status: status || undefined,
+    status: (status === 'deactivated' ? 0 : status === 'inactive' ? 1 : undefined) as number | undefined,
+  });
+
+  // Walks every room matching one concrete status (skip/take=100 loop), optionally
+  // scoped by a name/global_id search.
+  const fetchAllForStatus = async (status: RoomStatus, extra: { name?: string; global_id?: string }) => {
+    let skip = 0;
+    let grandTotal = Infinity;
+    const take = 100;
+    const all: RoomFromApi[] = [];
+    while (skip < grandTotal && skip < 5000) {
+      const res = await roomService.getRooms({ skip, take, ...statusParamsFor(status), ...extra });
+      grandTotal = res.total;
+      all.push(...res.data);
+      skip += take;
+    }
+    return all;
+  };
+
   const fetchRooms = async () => {
     setIsLoading(true);
     try {
-      const res = await roomService.getRooms({
-        skip: (currentPage - 1) * ITEMS_PER_PAGE,
-        take: ITEMS_PER_PAGE,
-        room_status: statusFilter || undefined,
-        // API only matches enabled/disabled rooms when `status` is sent alongside room_status:
-        // 0 = deactivated (disabled), 1 = activated-but-idle (inactive)
-        status: statusFilter === 'deactivated' ? 0 : statusFilter === 'inactive' ? 1 : undefined,
-      });
-      setRooms(res.data);
-      setTotal(res.total);
+      const q = debouncedSearch.trim();
+      // The API supports name (partial match) and global_id (exact match) as separate
+      // search params — route to whichever fits so a full UUID paste still matches
+      // exactly, and free text searches by name.
+      const isId = UUID_RE.test(q);
+      const searchParams = { name: q && !isId ? q : undefined, global_id: q && isId ? q : undefined };
+
+      if (!statusFilter) {
+        // The API can filter TO one specific room_status but has no way to filter OUT
+        // just 'deleted' — an unfiltered request mixes deleted rooms into the page
+        // (and, separately, isn't reliable about returning every other status either).
+        // So with no status filter selected, union the three real statuses ourselves;
+        // deleted rooms are simply never requested.
+        const results = await Promise.all(
+          NON_DELETED_STATUSES.map((status) => fetchAllForStatus(status, searchParams))
+        );
+        const seen = new Set<string>();
+        const merged: RoomFromApi[] = [];
+        for (const list of results) {
+          for (const room of list) {
+            if (seen.has(room.global_id)) continue;
+            seen.add(room.global_id);
+            merged.push(room);
+          }
+        }
+        setRooms(merged.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE));
+        setTotal(merged.length);
+      } else {
+        const res = await roomService.getRooms({
+          skip: (currentPage - 1) * ITEMS_PER_PAGE,
+          take: ITEMS_PER_PAGE,
+          ...statusParamsFor(statusFilter),
+          ...searchParams,
+        });
+        setRooms(res.data);
+        setTotal(res.total);
+      }
     } catch {
       showToast('Failed to load rooms', 'error');
     } finally {
@@ -82,10 +136,19 @@ export default function Rooms() {
     }
   };
 
+  // Debounce search input so each keystroke doesn't trigger an API call
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   useEffect(() => {
     fetchRooms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, debouncedSearch]);
 
   // Active/Inactive counts must reflect the whole dataset, not just the current page,
   // so they're fetched separately via the API's own filtered `total` — take:1 is enough
@@ -93,8 +156,8 @@ export default function Rooms() {
   const fetchStats = async () => {
     try {
       const [activeRes, inactiveRes] = await Promise.all([
-        roomService.getRooms({ room_status: 'active', take: 1 }),
-        roomService.getRooms({ room_status: 'inactive', take: 1 }),
+        roomService.getRooms({ take: 1, ...statusParamsFor('active') }),
+        roomService.getRooms({ take: 1, ...statusParamsFor('inactive') }),
       ]);
       setActiveTotal(activeRes.total);
       setInactiveTotal(inactiveRes.total);
@@ -141,16 +204,12 @@ export default function Rooms() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoom]);
 
-  // GET /v1/rooms doesn't document a search param, so filter by room name/ID
-  // client-side — this only narrows the rooms already fetched for the current page.
-  const filteredRooms = rooms.filter((room) => {
-    if (getDisplayStatus(room) === 'deleted') return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return room.room_name.toLowerCase().includes(q) || room.global_id.toLowerCase().includes(q);
-  });
-
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+  const handleCopyRoomId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    showToast('Room ID copied to clipboard', 'success');
+  };
 
   const handleDeactivateRoom = async () => {
     if (!deactivateRoomTarget) return;
@@ -213,7 +272,7 @@ export default function Rooms() {
           <input
             type="text"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t.rooms.searchPlaceholder}
             className="w-full bg-[#18181b] text-white placeholder:text-[#52525b] pl-4 pr-10 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
           />
@@ -248,10 +307,10 @@ export default function Rooms() {
         <TableBody>
           {isLoading ? (
             <TableMessageRow colSpan={8}>{t.common.loading ?? 'Loading...'}</TableMessageRow>
-          ) : filteredRooms.length === 0 ? (
+          ) : rooms.length === 0 ? (
             <TableMessageRow colSpan={8}>{t.common.noData}</TableMessageRow>
           ) : (
-            filteredRooms.map((room, idx) => (
+            rooms.map((room, idx) => (
               <TableRow key={room.global_id}>
                 <Td className="text-[#71717a]">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</Td>
                 <Td className="font-medium">{room.room_name}</Td>
@@ -316,8 +375,8 @@ export default function Rooms() {
         </TableBody>
       </TableContainer>
 
-      {/* Pagination — hidden while searching, since search only filters the current page */}
-      {!search && totalPages > 1 && (
+      {/* Pagination */}
+      {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -361,15 +420,27 @@ export default function Rooms() {
               {/* Info Tab */}
               {modalTab === 'info' && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="col-span-2">
+                    <p className="text-[#71717a] text-xs">{t.rooms.modal.roomId}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-white font-medium font-mono text-xs break-all">{selectedRoom.global_id}</p>
+                      <button
+                        onClick={() => handleCopyRoomId(selectedRoom.global_id)}
+                        className="p-1 rounded hover:bg-[#27272a] transition-colors flex-shrink-0"
+                        title="Copy Room ID"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-[#71717a]" />
+                      </button>
+                    </div>
+                  </div>
                   {[
-                    { label: t.rooms.modal.roomId, value: selectedRoom.global_id, mono: true },
-                    { label: t.rooms.modal.host, value: (roomDetail ?? selectedRoom).host?.name || (roomDetail ?? selectedRoom).host?.username || '-', mono: false },
-                    { label: 'Status', value: getStatusConfig(getDisplayStatus(selectedRoom)).label, mono: false },
-                    { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString(), mono: false },
+                    { label: t.rooms.modal.host, value: (roomDetail ?? selectedRoom).host?.name || (roomDetail ?? selectedRoom).host?.username || '-' },
+                    { label: 'Status', value: getStatusConfig(getDisplayStatus(selectedRoom)).label },
+                    { label: t.rooms.modal.createdAt, value: new Date(selectedRoom.created_at).toLocaleString() },
                   ].map((item) => (
-                    <div key={item.label} className={item.mono ? 'col-span-2' : undefined}>
+                    <div key={item.label}>
                       <p className="text-[#71717a] text-xs">{item.label}</p>
-                      <p className={`text-white font-medium mt-0.5 ${item.mono ? 'font-mono text-xs break-all' : ''}`}>{item.value}</p>
+                      <p className="text-white font-medium mt-0.5">{item.value}</p>
                     </div>
                   ))}
                 </div>

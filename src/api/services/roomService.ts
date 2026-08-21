@@ -37,6 +37,8 @@ export interface GetRoomsParams {
   take?: number;
   room_status?: RoomStatus;
   status?: number;
+  name?: string;
+  global_id?: string;
 }
 
 export interface RoomMovieGenre {
@@ -82,13 +84,15 @@ export interface RoomDetail extends RoomFromApi {
 }
 
 export const roomService = {
-  getRooms: ({ skip = 0, take = 10, room_status, status }: GetRoomsParams = {}) => {
+  getRooms: ({ skip = 0, take = 10, room_status, status, name, global_id }: GetRoomsParams = {}) => {
     const params: Record<string, string> = {
       skip: String(skip),
       take: String(take),
     };
     if (room_status) params.room_status = room_status;
     if (status !== undefined) params.status = String(status);
+    if (name) params.name = name;
+    if (global_id) params.global_id = global_id;
     return apiClient<GetRoomsResponse>('/v1/rooms', { params });
   },
 
