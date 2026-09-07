@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
 import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
@@ -43,7 +44,7 @@ const Subscriptions = () => {
   const { t } = useLanguage();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<
     "all" | "monthly" | "yearly" | "weekly"
@@ -708,7 +709,7 @@ const Subscriptions = () => {
                   setShowViewModal(false);
                   openEditModal(selectedPlan);
                 }}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 {t.subscriptions.editBtn}
               </button>

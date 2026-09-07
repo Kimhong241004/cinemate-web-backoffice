@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, Copy, Edit, Trash2, X, Check, Tv } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import { usePageParam } from "../hooks/usePageParam";
 import {
   tvChannelService,
   TvChannelFromApi,
@@ -30,7 +31,7 @@ const TAKE = 10;
 const TvChannels = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

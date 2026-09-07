@@ -26,6 +26,8 @@ export interface PromoCodeFromApi {
   updated_by: number;
   created_at: string;
   updated_at: string;
+  /** Set when this code was created as part of a private-code generation batch */
+  batch_id?: string;
   /** Only populated for private codes */
   assigned_users?: PromoCodeAssignedUser[];
 }
@@ -67,6 +69,8 @@ export interface GetPromoCodesParams {
   promo_code_type?: PromoCodeType;
   visibility?: "public" | "private";
   status?: 0 | 1;
+  /** Filter to codes generated together in this batch */
+  batch_id?: string;
 }
 
 export interface GeneratePromoCodesPayload {
@@ -89,6 +93,33 @@ export interface GeneratePromoCodesResponse {
   data: PromoCodeFromApi[];
 }
 
+export interface PromoCodeBatch {
+  batch_id: string;
+  codes_count: number;
+  description: string;
+  promo_code_type: PromoCodeType;
+  discount_amount: number;
+  discount_type: "percentage" | "amount";
+  visibility: "public" | "private";
+  max_uses_per_user: number;
+  usage_limit: number;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface GetPromoCodeBatchesResponse {
+  total: number;
+  take: number;
+  skip: number;
+  data: PromoCodeBatch[];
+}
+
+export interface GetPromoCodeBatchesParams {
+  skip?: number;
+  take?: number;
+  search?: string;
+}
+
 export const promoCodeService = {
   getPromoCodes: ({
     skip = 0,
@@ -98,6 +129,7 @@ export const promoCodeService = {
     promo_code_type,
     visibility,
     status,
+    batch_id,
   }: GetPromoCodesParams = {}) => {
     const params: Record<string, string> = {
       skip: String(skip),
@@ -108,6 +140,7 @@ export const promoCodeService = {
     if (promo_code_type) params.promo_code_type = promo_code_type;
     if (visibility) params.visibility = visibility;
     if (status !== undefined) params.status = String(status);
+    if (batch_id) params.batch_id = batch_id;
     return apiClient<GetPromoCodesResponse>("/v1/promo-codes", { params });
   },
 
@@ -136,4 +169,13 @@ export const promoCodeService = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  getPromoCodeBatches: ({ skip = 0, take = 10, search }: GetPromoCodeBatchesParams = {}) => {
+    const params: Record<string, string> = {
+      skip: String(skip),
+      take: String(take),
+    };
+    if (search) params.search = search;
+    return apiClient<GetPromoCodeBatchesResponse>("/v1/promo-codes/batches", { params });
+  },
 };

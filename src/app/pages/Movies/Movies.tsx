@@ -3,13 +3,43 @@ import { useNavigate } from 'react-router';
 import { Search, Plus, Eye, Edit, Trash2, X, Film, Star, Play, Clock, EyeOff } from 'lucide-react';
 import { useNotification } from '../../context/NotificationContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { usePageParam } from '../../hooks/usePageParam';
 import { useUploadManager, BackgroundUpload } from '../../context/UploadManagerContext';
-import { movieService, MovieFromApi, GenreFromApi } from '../../../api/services/movieService';
+import { movieService, MovieFromApi, GenreFromApi, MovieSource, MovieSeason, MovieEpisode } from '../../../api/services/movieService';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import Pagination from '../../components/shared/Pagination';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
 import { TableContainer, TableHead, Th, TableBody, TableRow, Td } from '../../components/shared/Table/Table';
-import { getVideoStatusDisplay } from '../../utils/videoStatus';
+import { getVideoStatusDisplay, getUploadStatusDisplay, isTerminalConvertStatus, VideoStatusDisplay } from '../../utils/videoStatus';
+
+// A series has no single video — each episode has its own movie_url/convert_status —
+// so roll all episodes up into one badge per column instead of picking just the first.
+const aggregateEpisodeStatus = (episodes: MovieEpisode[]): { upload: VideoStatusDisplay | null; convert: VideoStatusDisplay | null } => {
+  if (episodes.length === 0) return { upload: null, convert: null };
+
+  const uploadedCount = episodes.filter((e) => e.movie_url).length;
+  const upload = uploadedCount === 0
+    ? null
+    : uploadedCount === episodes.length
+      ? getUploadStatusDisplay('completed')
+      : { ...(getUploadStatusDisplay('pending') as VideoStatusDisplay), label: `Uploaded ${uploadedCount}/${episodes.length}` };
+
+  const convertStatuses = episodes.map((e) => e.convert_status).filter(Boolean);
+  let convert: VideoStatusDisplay | null = null;
+  if (convertStatuses.length > 0) {
+    const failedCount = convertStatuses.filter((s) => getVideoStatusDisplay(s)?.label === 'Failed').length;
+    const completedCount = convertStatuses.filter((s) => isTerminalConvertStatus(s) && getVideoStatusDisplay(s)?.label === 'Completed').length;
+    if (failedCount > 0) {
+      convert = { ...(getVideoStatusDisplay('failed') as VideoStatusDisplay), label: `Failed ${failedCount}/${episodes.length}` };
+    } else if (completedCount === episodes.length) {
+      convert = getVideoStatusDisplay('completed');
+    } else {
+      convert = { ...(getVideoStatusDisplay('processing') as VideoStatusDisplay), label: `Processing ${completedCount}/${episodes.length}` };
+    }
+  }
+
+  return { upload, convert };
+};
 
 const TAKE = 10;
 
@@ -72,7 +102,7 @@ const Movies = () => {
 
   const [searchQuery, setSearchQuery]         = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [currentPage, setCurrentPage]         = useState(1);
+  const [currentPage, setCurrentPage]         = usePageParam();
 
   const [selectedType,    setSelectedType]    = useState('');
   const [selectedGenre,   setSelectedGenre]   = useState('');
@@ -90,14 +120,25 @@ const Movies = () => {
   const [genres, setGenres] = useState<GenreFromApi[]>([]);
   const [stats, setStats]   = useState({ total: 0, published: 0, draft: 0, unpublished: 0 });
 
-  // Debounce search input so we don't hit the API on every keystroke
+  // GET /v1/movies (list) never includes `sources`/`seasons`, only GET /v1/movies/{id}
+  // (detail) does — so upload/convert status has to be fetched per row via the detail
+  // endpoint. `sources` backs the status columns for a full movie; `seasons` (with each
+  // episode's own movie_url/convert_status) backs them for a series.
+  const [sourcesByMovieId, setSourcesByMovieId] = useState<Record<string, MovieSource[]>>({});
+  const [seasonsByMovieId, setSeasonsByMovieId] = useState<Record<string, MovieSeason[]>>({});
+  const requestedSourceIdsRef = useRef<Set<string>>(new Set());
+
+  // Debounce search input so we don't hit the API on every keystroke.
+  // Skipped when searchQuery already matches debouncedSearch (e.g. on mount) so
+  // it doesn't clobber a page number restored from navigation state.
   useEffect(() => {
+    if (searchQuery === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, debouncedSearch]);
 
   const fetchMovies = useCallback(async () => {
     setIsLoading(true);
@@ -115,8 +156,6 @@ const Movies = () => {
         movie_status: movieStatus,
         genre: selectedGenre || undefined,
       });
-      // TEMP DEBUG — remove once we've confirmed whether the list response includes sources[]
-      console.log('[Movies debug] ' + JSON.stringify(res.data.map((m) => ({ title: m.title, sources: m.sources })), null, 2));
       setMovies(res.data);
       setTotal(res.total);
     } catch {
@@ -127,6 +166,24 @@ const Movies = () => {
   }, [currentPage, debouncedSearch, selectedType, selectedStatus, selectedGenre, showToast]);
 
   useEffect(() => { fetchMovies(); }, [fetchMovies]);
+
+  // Fetch each visible row's sources via the detail endpoint (the list endpoint never
+  // includes them) the first time we see that movie on this page.
+  useEffect(() => {
+    const idsToFetch = movies
+      .map((m) => m.global_id)
+      .filter((id) => !requestedSourceIdsRef.current.has(id));
+    if (idsToFetch.length === 0) return;
+    idsToFetch.forEach((id) => {
+      requestedSourceIdsRef.current.add(id);
+      movieService.getMovie(id)
+        .then((detail) => {
+          setSourcesByMovieId((prev) => ({ ...prev, [id]: detail.sources ?? [] }));
+          setSeasonsByMovieId((prev) => ({ ...prev, [id]: detail.seasons ?? [] }));
+        })
+        .catch(() => requestedSourceIdsRef.current.delete(id)); // allow retry on next pass
+    });
+  }, [movies]);
 
   // When a background upload for a movie on this page fails, surface the error
   // and drop it from the row immediately.
@@ -329,13 +386,14 @@ const Movies = () => {
           <Th>Access Type</Th>
           <Th>{t.movies.status}</Th>
           <Th>Upload Status</Th>
+          <Th>Converting Status</Th>
           <Th align="center">{t.movies.actions}</Th>
         </TableHead>
 
         <TableBody>
           {isLoading ? (
             <tr>
-              <td colSpan={12} className="px-4 py-12 text-center">
+              <td colSpan={13} className="px-4 py-12 text-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-2 border-[#ef4444] border-t-transparent rounded-full animate-spin" />
                   <p className="text-[#71717a] text-sm">Loading...</p>
@@ -344,7 +402,7 @@ const Movies = () => {
             </tr>
           ) : displayedMovies.length === 0 ? (
             <tr>
-              <td colSpan={12} className="px-4 py-12 text-center">
+              <td colSpan={13} className="px-4 py-12 text-center">
                 <Film className="w-10 h-10 text-[#3f3f46] mx-auto mb-3" />
                 <p className="text-[#71717a] text-sm">{t.movies.noMoviesFound}</p>
               </td>
@@ -352,15 +410,32 @@ const Movies = () => {
           ) : (
             displayedMovies.map((movie, index) => {
               const ql         = qualityLabel(movie.video_quality);
-              const src0       = movie.sources?.[0];
-              const vidStatus  = getVideoStatusDisplay(src0?.convert_status);
+              const isSeries   = movie.content_type === 'series';
+              const src0       = sourcesByMovieId[movie.global_id]?.[0];
+              const episodes   = isSeries ? (seasonsByMovieId[movie.global_id] ?? []).flatMap((s) => s.episodes) : [];
+              const episodeAgg = isSeries ? aggregateEpisodeStatus(episodes) : null;
+              const vidStatus  = isSeries ? episodeAgg!.convert : getVideoStatusDisplay(src0?.convert_status);
               const accessType = movie.movie_type?.toLowerCase() ?? 'free';
               const movieUploads     = getUploadsForMovie(movie.global_id);
               const activeUpload     = movieUploads.find((u) => u.target === 'movie' && u.status !== 'error')
                 ?? movieUploads.find((u) => u.target === 'trailer' && u.status !== 'error');
               const convertingStatus = activeUpload?.status === 'converting'
-                ? getVideoStatusDisplay(activeUpload.convertStatus) ?? { dot: 'bg-[#eab308]', label: 'Converting' }
+                ? getVideoStatusDisplay(activeUpload.convertStatus) ?? { dot: 'bg-[#eab308]', badgeCls: 'bg-[#eab308]/20 text-[#eab308]', label: 'Converting', terminal: false }
                 : null;
+              // File-transfer progress, independent of transcoding. The API doesn't expose
+              // upload_global_id on sources (only the standalone upload-status endpoint does,
+              // and that's only reachable while we still hold the id from an in-session
+              // upload), so for rows uploaded elsewhere (e.g. Swagger) the presence of
+              // movie_url is the only signal we have that the file finished transferring.
+              // Series content has no `sources` at all — its upload state is rolled up
+              // per-episode from `seasons` instead (aggregateEpisodeStatus above).
+              const uploadStatusDisplay = activeUpload
+                ? null
+                : isSeries
+                  ? episodeAgg!.upload
+                  : src0
+                    ? getUploadStatusDisplay(src0.movie_url ? 'completed' : 'pending')
+                    : null;
 
               return (
                 <TableRow key={movie.global_id}>
@@ -445,34 +520,46 @@ const Movies = () => {
                     />
                   </Td>
 
-                  {/* Video */}
+                  {/* Upload Status — file transfer, not transcoding */}
                   <Td>
-                    {convertingStatus ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                        <span className={`w-1.5 h-1.5 rounded-full ${convertingStatus.dot} animate-pulse`} />
-                        <span className="text-[#a1a1aa]">{convertingStatus.label}</span>
-                      </span>
-                    ) : activeUpload ? (
+                    {activeUpload ? (
                       <div className="w-32">
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs font-medium ${activeUpload.status === 'completed' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
-                            {uploadPhaseLabel[activeUpload.status]}
+                          <span className={`text-xs font-medium ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                            {activeUpload.status === 'converting' ? 'Completed' : uploadPhaseLabel[activeUpload.status]}
                           </span>
-                          <span className={`text-xs font-semibold ${activeUpload.status === 'completed' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
-                            {Math.min(activeUpload.progress, 100)}%
+                          <span className={`text-xs font-semibold ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                            {activeUpload.status === 'converting' ? 100 : Math.min(activeUpload.progress, 100)}%
                           </span>
                         </div>
-                        <div className={`w-full h-2 rounded-full overflow-hidden ${activeUpload.status === 'completed' ? 'bg-[#22c55e]/20' : 'bg-[#3b82f6]/20'}`}>
+                        <div className={`w-full h-2 rounded-full overflow-hidden ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'bg-[#22c55e]/20' : 'bg-[#3b82f6]/20'}`}>
                           <div
-                            className={`h-full rounded-full transition-all ${activeUpload.status === 'completed' ? 'bg-[#22c55e]' : 'bg-[#3b82f6]'}`}
-                            style={{ width: `${Math.min(activeUpload.progress, 100)}%` }}
+                            className={`h-full rounded-full transition-all ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'bg-[#22c55e]' : 'bg-[#3b82f6]'}`}
+                            style={{ width: `${activeUpload.status === 'converting' ? 100 : Math.min(activeUpload.progress, 100)}%` }}
                           />
                         </div>
                       </div>
+                    ) : uploadStatusDisplay ? (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${uploadStatusDisplay.badgeCls}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${uploadStatusDisplay.dot}`} />
+                        {uploadStatusDisplay.label}
+                      </span>
+                    ) : (
+                      <span className="text-[#52525b] text-sm">—</span>
+                    )}
+                  </Td>
+
+                  {/* Converting Status — transcoding, independent of upload */}
+                  <Td>
+                    {convertingStatus ? (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${convertingStatus.badgeCls}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${convertingStatus.dot} animate-pulse`} />
+                        {convertingStatus.label}
+                      </span>
                     ) : vidStatus ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${vidStatus.badgeCls}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${vidStatus.dot}`} />
-                        <span className="text-[#a1a1aa]">{vidStatus.label}</span>
+                        {vidStatus.label}
                       </span>
                     ) : (
                       <span className="text-[#52525b] text-sm">—</span>
@@ -491,7 +578,7 @@ const Movies = () => {
                       >
                         <Star className={`w-4 h-4 ${movie.is_highlight ? 'fill-[#eab308] text-[#eab308]' : 'text-[#52525b]'}`} />
                       </button>
-                      <button onClick={() => navigate(`/movies/edit/${movie.global_id}`)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Edit">
+                      <button onClick={() => navigate(`/movies/edit/${movie.global_id}?page=${currentPage}`)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Edit">
                         <Edit className="w-4 h-4 text-[#3b82f6]" />
                       </button>
                       <button onClick={() => setDeleteMovie(movie)} className="p-2 rounded-lg hover:bg-[#27272a] transition-colors" title="Delete">
@@ -605,8 +692,8 @@ const Movies = () => {
                   className="px-4 py-2 rounded-xl bg-[#27272a] text-white text-sm font-medium hover:bg-[#3f3f46] transition-colors">
                   {t.common.close}
                 </button>
-                <button onClick={() => { setViewMovie(null); navigate(`/movies/edit/${viewMovie.global_id}`); }}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ef4444] to-[#f97316] text-white text-sm font-semibold hover:opacity-90 transition-opacity">
+                <button onClick={() => { setViewMovie(null); navigate(`/movies/edit/${viewMovie.global_id}?page=${currentPage}`); }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] text-white text-sm font-semibold hover:opacity-90 transition-opacity">
                   {t.movies.editMovie}
                 </button>
               </div>

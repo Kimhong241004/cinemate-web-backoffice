@@ -1,9 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { movieService, UploadTarget } from '../../api/services/movieService';
-import { isTerminalConvertStatus } from '../utils/videoStatus';
-
-const CONVERT_POLL_INTERVAL_MS = 4000;
-const CONVERT_POLL_TIMEOUT_MS = 10 * 60 * 1000; // give up watching after 10 min; the movies list will still catch up on its own
+import { pollConvertStatus } from '../utils/pollConvertStatus';
 
 export interface BackgroundUpload {
   id: string;
@@ -32,26 +29,6 @@ export const UploadManagerProvider = ({ children }: { children: ReactNode }) => 
     setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
   }, []);
 
-  // Attaching the upload starts HLS transcoding server-side — it isn't done the moment
-  // that call returns, so poll the standalone upload-status endpoint for convert_status
-  // until it reaches a terminal state (or we hit the timeout, at which point we stop
-  // watching and let the movies list's own periodic refetch catch the eventual result).
-  const pollConvertStatus = useCallback(async (id: string, uploadGlobalId: string) => {
-    const start = Date.now();
-    while (Date.now() - start < CONVERT_POLL_TIMEOUT_MS) {
-      try {
-        const res = await movieService.getUploadStatus(uploadGlobalId);
-        if (res.convert_status) {
-          updateUpload(id, { convertStatus: res.convert_status });
-          if (isTerminalConvertStatus(res.convert_status)) return;
-        }
-      } catch {
-        // transient poll failure — keep trying until the timeout
-      }
-      await new Promise((resolve) => setTimeout(resolve, CONVERT_POLL_INTERVAL_MS));
-    }
-  }, [updateUpload]);
-
   // Fires the chunked upload + attach-to-movie sequence without the caller awaiting it,
   // so it keeps running after the admin navigates away (this provider sits above the router).
   const startBackgroundUpload = useCallback((movieGlobalId: string, target: UploadTarget, file: File) => {
@@ -68,13 +45,13 @@ export const UploadManagerProvider = ({ children }: { children: ReactNode }) => 
           ? { trailer_upload_id: uploadGlobalId }
           : { upload_id: uploadGlobalId });
         updateUpload(id, { status: 'converting' });
-        await pollConvertStatus(id, uploadGlobalId);
+        await pollConvertStatus(uploadGlobalId, (convertStatus) => updateUpload(id, { convertStatus }));
         updateUpload(id, { status: 'completed' });
       } catch (err) {
         updateUpload(id, { status: 'error', error: err instanceof Error ? err.message : 'Upload failed' });
       }
     })();
-  }, [updateUpload, pollConvertStatus]);
+  }, [updateUpload]);
 
   const getUploadsForMovie = useCallback(
     (movieGlobalId: string) => uploads.filter((u) => u.movieGlobalId === movieGlobalId),

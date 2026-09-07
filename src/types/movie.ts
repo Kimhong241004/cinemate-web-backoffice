@@ -3,6 +3,7 @@ export interface MovieFormValues {
   releaseYear: string;
   genre: string[];
   language: string;
+  country: string;
   quality: string;
   description: string;
   keywords: string[];
@@ -33,6 +34,7 @@ export interface MovieFormErrors {
   releaseYear: string;
   genre: string;
   language: string;
+  country: string;
   quality: string;
   description: string;
   keywords: string;
@@ -49,6 +51,11 @@ export interface SliderImage {
 
 export interface Episode {
   id: number;
+  /** Set only for an episode that already exists on the server (loaded on Edit) —
+   * used to call the lock/unlock endpoint directly instead of guessing is_free. */
+  globalId?: string;
+  /** The server's current lock state for an existing episode; kept in sync with isFree. */
+  isLocked?: boolean;
   episodeNumber: number;
   title: string;
   isFree: boolean;
@@ -59,10 +66,15 @@ export interface Episode {
   videoFile: File | null;
   videoPreview: string;
   uploadProgress: number;
+  /** Transcode status of the uploaded video, polled after the chunked upload completes. */
+  convertStatus?: string;
 }
 
 export interface Season {
   id: number;
+  /** Set only for a season that already exists on the server (loaded on Edit) —
+   * used to call the unlock-all-episodes endpoint keyed on the season's real global_id. */
+  globalId?: string;
   seasonNumber: number;
   episodes: Episode[];
 }
@@ -75,7 +87,14 @@ export interface MovieFormProps {
   isSubmitting: boolean;
   initialValues?: Partial<MovieFormValues>;
   initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
+  initialSeasons?: Season[];
   onCancel: () => void;
-  onSubmit: (values: MovieFormValues, files: MovieFormFiles, seasons: Season[]) => void;
+  onSubmit: (
+    values: MovieFormValues,
+    files: MovieFormFiles,
+    seasons: Season[],
+    updateEpisodeField: (seasonId: number, episodeId: number, field: keyof Episode, value: any) => void,
+    sliders: SliderImage[]
+  ) => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 }

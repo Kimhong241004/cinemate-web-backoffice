@@ -32,17 +32,26 @@ export interface MovieSource {
 }
 
 export interface MovieEpisode {
-  id: number;
   global_id: string;
+  season_id: number;
   episode_number: number;
   title: string;
   duration: number | null;
   release_date: string;
+  isLocked: boolean;
+  movie_url: string | null;
+  convert_status: string;
+  status?: number;
+  created_at?: string;
 }
 
 export interface MovieSeason {
-  id: number;
+  global_id: string;
+  movie_id?: number;
   season_number: number;
+  total_episodes?: number;
+  status?: number;
+  created_at?: string;
   episodes: MovieEpisode[];
 }
 
@@ -142,6 +151,7 @@ export interface UpdateMovieData extends Partial<CreateMovieData> {
 export interface UploadMovieMediaData {
   poster_file?: File;
   cover_file?: File;
+  slider_file?: File;
 }
 
 export type UploadTarget = 'trailer' | 'movie';
@@ -186,11 +196,15 @@ export interface UploadStatus {
 }
 
 export interface LockEpisodesData {
-  /** Locks/unlocks every episode within these seasons */
-  season_global_ids?: string[];
+  isLocked: boolean;
+  /** Locks/unlocks every episode within this season */
+  seasonId?: string;
   /** Locks/unlocks these specific episodes */
-  episode_global_ids?: string[];
-  is_locked: boolean;
+  episode_id?: string[];
+}
+
+export interface LockEpisodesResponse {
+  message: string;
 }
 
 export const movieService = {
@@ -232,6 +246,7 @@ export const movieService = {
     const form = new FormData();
     if (data.poster_file) form.append('poster_file', data.poster_file);
     if (data.cover_file) form.append('cover_file', data.cover_file);
+    if (data.slider_file) form.append('slider_file', data.slider_file);
     return apiClient<MovieFromApi>(`/v1/movies/${globalId}/media`, {
       method: 'POST',
       body: form,
@@ -261,7 +276,7 @@ export const movieService = {
   },
 
   lockEpisodes: (data: LockEpisodesData) => {
-    return apiClient<void>('/v1/movies/episodes/lock', {
+    return apiClient<LockEpisodesResponse>('/v1/movies/episodes/lock', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -271,16 +286,32 @@ export const movieService = {
   // upload, and returns the upload_global_id for use as upload_id/trailer_upload_id.
   // onProgress reports 0-100 based on parts completed (uploading phase only —
   // it does not track server-side conversion, which happens after completeUpload).
-  uploadFileInChunks: async (target: UploadTarget, file: File, onProgress?: (pct: number) => void): Promise<string> => {
-    const session = await movieService.initUpload(target, {
+  //
+  // `resume` lets a caller continue an interrupted upload (e.g. after a page reload)
+  // instead of re-initializing: pass back the original `session` (still holding the
+  // presigned part URLs, valid until session.expires_in) plus whichever parts already
+  // finished, and only the remaining parts get PUT. onSessionReady/onPartComplete exist
+  // so a caller can persist enough state to build that `resume` object later.
+  uploadFileInChunks: async (
+    target: UploadTarget,
+    file: File,
+    options: UploadFileInChunksOptions = {}
+  ): Promise<string> => {
+    const { onProgress, onSessionReady, onPartComplete, resume } = options;
+
+    const session = resume?.session ?? await movieService.initUpload(target, {
       file_size: file.size,
       file_name: file.name,
       mime_type: file.type || 'video/mp4',
     });
+    onSessionReady?.(session);
 
-    const parts: CompleteUploadPart[] = [];
-    onProgress?.(0);
+    const parts: CompleteUploadPart[] = [...(resume?.completedParts ?? [])];
+    const alreadyDone = new Set(parts.map((p) => p.part_number));
+    onProgress?.(Math.round((parts.length / session.total_parts) * 100));
+
     for (const part of session.parts) {
+      if (alreadyDone.has(part.part_number)) continue;
       const start = (part.part_number - 1) * session.chunk_size;
       const chunk = file.slice(start, start + session.chunk_size);
       const res = await fetch(part.url, { method: 'PUT', body: chunk });
@@ -291,7 +322,9 @@ export const movieService = {
       if (!etag) {
         throw new Error(`Storage did not return an ETag for part ${part.part_number} (check CORS Access-Control-Expose-Headers)`);
       }
-      parts.push({ part_number: part.part_number, etag });
+      const completedPart = { part_number: part.part_number, etag };
+      parts.push(completedPart);
+      onPartComplete?.(completedPart);
       onProgress?.(Math.round((parts.length / session.total_parts) * 100));
     }
 

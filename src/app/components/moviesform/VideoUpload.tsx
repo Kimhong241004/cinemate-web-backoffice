@@ -1,6 +1,7 @@
 import { RefObject, useEffect, useRef } from 'react';
 import { Film, Play, Upload, X } from 'lucide-react';
 import Hls from 'hls.js';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface VideoUploadProps {
   label: string;
@@ -18,6 +19,7 @@ interface VideoUploadProps {
 const VideoUpload = ({
   label, uploadText, file, preview, previewLabel, iconColorClass, inputRef, onChange, onRemove, maxPreviewHeight = '300px',
 }: VideoUploadProps) => {
+  const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -68,7 +70,7 @@ const VideoUpload = ({
           <div className="flex flex-col items-center text-center">
             <Upload className="w-10 h-10 text-[#71717a] mb-2" />
             <p className="text-white text-sm font-medium">{uploadText}</p>
-            <p className="text-[#71717a] text-xs mt-1">Click to browse or drag and drop</p>
+            <p className="text-[#71717a] text-xs mt-1">{t.movies.form.clickToBrowseVideo}</p>
           </div>
         )}
       </div>

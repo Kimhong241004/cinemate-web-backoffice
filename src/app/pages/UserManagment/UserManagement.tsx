@@ -7,6 +7,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import { userService, UserFromApi } from "../../../api/services/userService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
@@ -28,7 +29,7 @@ const formatDate = (dateStr: string | null) => {
 
 const UserManagement = () => {
   const { t } = useLanguage();
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
@@ -54,14 +55,17 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debounce search input
+  // Debounce search input. Skipped when searchQuery already matches
+  // debouncedSearch (e.g. on mount) so it doesn't clobber a page number
+  // restored from the URL.
   useEffect(() => {
+    if (searchQuery === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, debouncedSearch]);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);

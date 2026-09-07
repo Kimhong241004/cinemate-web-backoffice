@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Download, X, Check, Eye, RefreshCw } from 'lucide-react';
+import { usePageParam } from '../../hooks/usePageParam';
 import Pagination from '../../components/shared/Pagination';
 import StatusFilterDropdown from '../../components/shared/FilterDropdown/StatusFilterDropdown';
 import { TableContainer, TableHead, Th, TableBody, TableRow, Td, TableMessageRow } from '../../components/shared/Table/Table';
@@ -73,7 +74,7 @@ const Transactions = () => {
   const [summary, setSummary] = useState<TransactionSummary>(EMPTY_SUMMARY);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedType, setSelectedType] = useState('');

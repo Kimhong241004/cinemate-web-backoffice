@@ -5,6 +5,7 @@ export const defaultMovieFormValues: MovieFormValues = {
   releaseYear: '',
   genre: [],
   language: '',
+  country: '',
   quality: '',
   description: '',
   keywords: [],
@@ -17,11 +18,12 @@ export const defaultMovieFormValues: MovieFormValues = {
 };
 
 export const defaultMovieFormErrors: MovieFormErrors = {
-  title: '', releaseYear: '', genre: '', language: '', quality: '',
+  title: '', releaseYear: '', genre: '', language: '', country: '', quality: '',
   description: '', keywords: '', price: '', poster: '', cover: '',
 };
 
 export const languageOptions = ['Khmer', 'English', 'Chinese', 'Korean', 'Thai', 'Japanese', 'Hindi'];
+export const countryOptions = ['Cambodia', 'United States', 'China', 'South Korea', 'Thailand', 'Japan', 'India'];
 export const qualityOptions = ['FHD', 'HD', 'SD'];
 
 export const getYearOptions = (): number[] => {

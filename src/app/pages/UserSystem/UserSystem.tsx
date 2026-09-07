@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageParam } from "../../hooks/usePageParam";
 import Pagination from "../../components/shared/Pagination";
 import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
 import {
@@ -59,7 +60,7 @@ const UserSystem = () => {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);

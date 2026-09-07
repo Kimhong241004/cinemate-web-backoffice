@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Edit, Trash2, X, Check, UserCog } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { usePageParam } from '../hooks/usePageParam';
 import { creatorService } from '../../api/services/creatorService';
 import Pagination from '../components/shared/Pagination';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -32,7 +33,7 @@ const ITEMS_PER_PAGE = 10;
 const Creators = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [creators, setCreators] = useState<Creator[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +95,10 @@ const Creators = () => {
     return () => clearTimeout(timer);
   }, [fetchCreators]);
 
+  // Skips the initial mount so it doesn't clobber a page number restored from the URL.
+  const isFirstSearchRender = useRef(true);
   useEffect(() => {
+    if (isFirstSearchRender.current) { isFirstSearchRender.current = false; return; }
     setCurrentPage(1);
   }, [searchQuery]);
 

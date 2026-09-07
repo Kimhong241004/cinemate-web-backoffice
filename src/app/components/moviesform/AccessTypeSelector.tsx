@@ -1,20 +1,24 @@
-type AccessType = 'buy' | 'membership' | 'free';
+import { useLanguage } from '../../context/LanguageContext';
 
-const accessTypeOptions: { value: AccessType; label: string }[] = [
-  { value: 'buy', label: 'Buy' },
-  { value: 'membership', label: 'Membership' },
-  { value: 'free', label: 'Free' },
-];
+type AccessType = 'buy' | 'membership' | 'free';
 
 interface AccessTypeSelectorProps {
   accessType: AccessType[];
   onToggle: (type: AccessType) => void;
 }
 
-const AccessTypeSelector = ({ accessType, onToggle }: AccessTypeSelectorProps) => (
+const AccessTypeSelector = ({ accessType, onToggle }: AccessTypeSelectorProps) => {
+  const { t } = useLanguage();
+  const accessTypeOptions: { value: AccessType; label: string }[] = [
+    { value: 'buy', label: t.movies.form.accessBuy },
+    { value: 'membership', label: t.movies.form.accessMembership },
+    { value: 'free', label: t.movies.form.accessFree },
+  ];
+
+  return (
   <div>
     <label className="block text-white text-sm font-medium mb-2">
-      ប្រភេទចូលប្រើ (Access Type) *
+      {t.movies.form.accessType} *
     </label>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       {accessTypeOptions.map((opt) => (
@@ -31,6 +35,7 @@ const AccessTypeSelector = ({ accessType, onToggle }: AccessTypeSelectorProps) =
       ))}
     </div>
   </div>
-);
+  );
+};
 
 export default AccessTypeSelector;

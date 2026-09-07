@@ -7,11 +7,18 @@ import { authorService, AuthorFromApi } from '../../api/services/authorService';
 interface UseMovieFormOptions {
   initialValues?: Partial<MovieFormValues>;
   initialPreviews?: { poster?: string; cover?: string; trailer?: string; video?: string };
+  initialSeasons?: Season[];
   showToast: (message: string, type: 'success' | 'error') => void;
-  onSubmit: (values: MovieFormValues, files: MovieFormFiles, seasons: Season[]) => void;
+  onSubmit: (
+    values: MovieFormValues,
+    files: MovieFormFiles,
+    seasons: Season[],
+    updateEpisodeField: (seasonId: number, episodeId: number, field: keyof Episode, value: any) => void,
+    sliders: SliderImage[]
+  ) => void;
 }
 
-export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubmit }: UseMovieFormOptions) => {
+export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, showToast, onSubmit }: UseMovieFormOptions) => {
   const posterInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const trailerInputRef = useRef<HTMLInputElement>(null);
@@ -33,7 +40,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     video: initialPreviews?.video ?? '',
   });
 
-  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>(() => initialSeasons ?? []);
   const [sliders, setSliders] = useState<SliderImage[]>([]);
   const [isGeneratingKeywords, setIsGeneratingKeywords] = useState(false);
 
@@ -253,7 +260,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
         if (season.id === seasonId) {
           return {
             ...season,
-            episodes: season.episodes.map(ep => ep.id === episodeId ? { ...ep, videoFile: file, videoPreview: videoURL } : ep),
+            episodes: season.episodes.map(ep => ep.id === episodeId ? { ...ep, videoFile: file, videoPreview: videoURL, uploadProgress: 0, convertStatus: undefined } : ep),
           };
         }
         return season;
@@ -262,8 +269,13 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     }
   };
 
+  // Uses the functional setState form (not `seasons.map(...)` off the closed-over variable)
+  // because this gets called multiple times in a row across an await — e.g. toggleEpisodeFree's
+  // isFree update followed later by its isLocked confirmation, or the many onProgress ticks
+  // during an episode's chunked upload. Building off a stale `seasons` snapshot each time would
+  // make each call silently discard whatever the previous one had already applied.
   const updateEpisodeField = (seasonId: number, episodeId: number, field: keyof Episode, value: any) => {
-    setSeasons(seasons.map(season => {
+    setSeasons(prev => prev.map(season => {
       if (season.id === seasonId) {
         return {
           ...season,
@@ -274,11 +286,52 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     }));
   };
 
+  // For an episode that already exists on the server, "Free episode" is the lock/unlock
+  // endpoint (keyed on the episode's real global_id), not a field resent through the
+  // movie update payload — that way toggling it here can't clobber other episodes' state
+  // with a guessed default the way resending the whole seasons array would. New episodes
+  // (no global_id yet) just track the value locally to send as is_free once created.
+  const toggleEpisodeFree = async (seasonId: number, episodeId: number, isFree: boolean) => {
+    const episode = seasons.find(s => s.id === seasonId)?.episodes.find(e => e.id === episodeId);
+    updateEpisodeField(seasonId, episodeId, 'isFree', isFree);
+    if (!episode?.globalId) return;
+    try {
+      await movieService.lockEpisodes({ isLocked: !isFree, episode_id: [episode.globalId] });
+      updateEpisodeField(seasonId, episodeId, 'isLocked', !isFree);
+    } catch (err) {
+      updateEpisodeField(seasonId, episodeId, 'isFree', !isFree);
+      showToast(err instanceof Error ? err.message : 'Failed to update episode lock status', 'error');
+    }
+  };
+
+  // Locks/unlocks every episode in a season in one call, keyed on the season's real global_id —
+  // same rationale as toggleEpisodeFree: hits the dedicated endpoint instead of resending
+  // the whole seasons array, and only applies to seasons that already exist on the server.
+  const setSeasonEpisodesLock = async (seasonId: number, isLocked: boolean) => {
+    const season = seasons.find(s => s.id === seasonId);
+    if (!season?.globalId) return;
+    try {
+      await movieService.lockEpisodes({ isLocked, seasonId: season.globalId });
+      setSeasons(prev => prev.map(s => (
+        s.id === seasonId
+          ? { ...s, episodes: s.episodes.map(ep => ({ ...ep, isFree: !isLocked, isLocked })) }
+          : s
+      )));
+      showToast(isLocked ? 'All episodes locked' : 'All episodes unlocked', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update episode lock status', 'error');
+    }
+  };
+
+  const unlockSeasonEpisodes = (seasonId: number) => setSeasonEpisodesLock(seasonId, false);
+  const lockSeasonEpisodes = (seasonId: number) => setSeasonEpisodesLock(seasonId, true);
+
   const isFormValid = () => {
     if (!formData.title.trim()) return false;
     if (!formData.releaseYear.trim() || !/^\d{4}$/.test(formData.releaseYear)) return false;
     if (formData.genre.length === 0) return false;
     if (!formData.language) return false;
+    if (!formData.country) return false;
     if (!formData.quality) return false;
     if (!formData.description.trim()) return false;
     if (formData.keywords.length === 0) return false;
@@ -302,6 +355,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
 
     if (formData.genre.length === 0) { errors.genre = 'Please select at least one genre'; isValid = false; }
     if (!formData.language) { errors.language = 'Language is required'; isValid = false; }
+    if (!formData.country) { errors.country = 'Country is required'; isValid = false; }
     if (!formData.quality) { errors.quality = 'Video quality is required'; isValid = false; }
     if (!formData.description.trim()) { errors.description = 'Description is required'; isValid = false; }
     if (formData.keywords.length === 0) { errors.keywords = 'At least one keyword is required for SEO'; isValid = false; }
@@ -324,7 +378,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
       showToast('Please fix all errors before submitting', 'error');
       return;
     }
-    onSubmit(formData, files, seasons);
+    onSubmit(formData, files, seasons, updateEpisodeField, sliders);
   };
 
   return {
@@ -364,6 +418,9 @@ export const useMovieForm = ({ initialValues, initialPreviews, showToast, onSubm
     handleEpisodeThumbnailChange,
     handleEpisodeVideoChange,
     updateEpisodeField,
+    toggleEpisodeFree,
+    unlockSeasonEpisodes,
+    lockSeasonEpisodes,
     isFormValid,
     handleSubmit,
   };

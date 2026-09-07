@@ -1,5 +1,6 @@
 import { Check, Search, X } from 'lucide-react';
 import { AuthorFromApi } from '../../../api/services/authorService';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AuthorsSelectorProps {
   selectedAuthors: AuthorFromApi[];
@@ -16,10 +17,12 @@ interface AuthorsSelectorProps {
 const AuthorsSelector = ({
   selectedAuthors, filteredAuthors, selectedAuthorIds, authorSearch, showDropdown,
   onSearchChange, onFocus, onSelectAuthor, onRemoveAuthor,
-}: AuthorsSelectorProps) => (
+}: AuthorsSelectorProps) => {
+  const { t } = useLanguage();
+  return (
   <div className="relative">
     <label className="block text-white text-sm font-medium mb-2">
-      តួអង្គ (Cast/Authors)
+      {t.movies.form.castAuthors}
     </label>
 
     {selectedAuthors.length > 0 && (
@@ -43,7 +46,7 @@ const AuthorsSelector = ({
         onChange={(e) => onSearchChange(e.target.value)}
         onFocus={onFocus}
         className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] pl-10 pr-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
-        placeholder="Search authors..."
+        placeholder={t.movies.form.searchAuthors}
       />
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
     </div>
@@ -70,11 +73,12 @@ const AuthorsSelector = ({
             </button>
           ))
         ) : (
-          <div className="px-4 py-3 text-[#71717a] text-sm">No authors found</div>
+          <div className="px-4 py-3 text-[#71717a] text-sm">{t.movies.form.noAuthorsFound}</div>
         )}
       </div>
     )}
   </div>
-);
+  );
+};
 
 export default AuthorsSelector;

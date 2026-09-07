@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus } from "lucide-react";
 import { useNotification } from "../../context/NotificationContext";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
 import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
@@ -11,8 +12,10 @@ import PromoCodeListItem, {
   PromoCodeListItemSkeleton,
   type PromoCode,
 } from "../../components/promocodes/PromoCodeListItem";
+import PromoCodeBatchCard from "../../components/promocodes/PromoCodeBatchCard";
 import {
   promoCodeService,
+  type PromoCodeBatch,
   type PromoCodeFromApi,
   type PromoCodeType,
 } from "../../../api/services/promoCodeService";
@@ -53,7 +56,7 @@ const PromoCodes = () => {
   const { showToast, addNotification } = useNotification();
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [selectedStatus, setSelectedStatus] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
@@ -66,6 +69,9 @@ const PromoCodes = () => {
   const [viewCodesPromo, setViewCodesPromo] = useState<PromoCode | null>(null);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [total, setTotal] = useState(0);
+  const [promoBatches, setPromoBatches] = useState<PromoCodeBatch[]>([]);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [loadingBatchId, setLoadingBatchId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<PromoCodeTypeFilter>("all");
   const [selectedVisibility, setSelectedVisibility] = useState("");
   const [selectedDiscount, setSelectedDiscount] = useState("");
@@ -106,6 +112,20 @@ const PromoCodes = () => {
     try {
       const take = ENTRIES_PER_PAGE;
       const skip = (page - 1) * ENTRIES_PER_PAGE;
+
+      if (visibility === "private") {
+        const res = await promoCodeService.getPromoCodeBatches({
+          skip,
+          take,
+          search: search || undefined,
+        });
+        setPromoBatches(res.data);
+        setBatchTotal(res.total);
+        setPromoCodes([]);
+        setTotal(0);
+        return;
+      }
+
       const apiStatus =
         status === "active" ? 1 : status === "inactive" ? 0 : undefined;
       const res = await promoCodeService.getPromoCodes({
@@ -119,6 +139,8 @@ const PromoCodes = () => {
       });
       setPromoCodes(res.data.map(mapFromApi));
       setTotal(res.total);
+      setPromoBatches([]);
+      setBatchTotal(0);
     } catch {
       showToast("Failed to load promo codes", "error");
     } finally {
@@ -130,12 +152,45 @@ const PromoCodes = () => {
     fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount);
   }, [currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount]);
 
+  const handleViewBatchCodes = async (batch: PromoCodeBatch) => {
+    setLoadingBatchId(batch.batch_id);
+    try {
+      const res = await promoCodeService.getPromoCodes({
+        batch_id: batch.batch_id,
+        take: batch.codes_count || ENTRIES_PER_PAGE,
+      });
+      setViewCodesPromo({
+        globalId: `batch-${batch.batch_id}`,
+        id: 0,
+        code: batch.description || "Private batch",
+        description: batch.description,
+        promoCodeType: [batch.promo_code_type],
+        status: "active",
+        discountType: batch.discount_type,
+        discountValue: batch.discount_amount,
+        usageCount: 0,
+        usageLimit: batch.usage_limit,
+        expiresAt: batch.expires_at.split("T")[0],
+        createdAt: batch.created_at.split("T")[0],
+        visibility: "private",
+        generatedCodes: res.data.map((c) => ({ code: c.code, used: c.used_count > 0 })),
+      });
+    } catch {
+      showToast("Failed to load batch codes", "error");
+    } finally {
+      setLoadingBatchId(null);
+    }
+  };
+
+  const isBatchView = selectedVisibility === "private";
+
   // 'expired' has no API-side filter — derive it client-side from the mapped data.
   const filteredPromoCodes = promoCodes.filter(
     (promo) => selectedStatus !== "expired" || promo.status === "expired",
   );
 
-  const totalPages = Math.max(1, Math.ceil(total / ENTRIES_PER_PAGE));
+  const listTotal = isBatchView ? batchTotal : total;
+  const totalPages = Math.max(1, Math.ceil(listTotal / ENTRIES_PER_PAGE));
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -390,8 +445,8 @@ const PromoCodes = () => {
     }
   };
 
-  const startEntry = total === 0 ? 0 : (currentPage - 1) * ENTRIES_PER_PAGE + 1;
-  const endEntry = Math.min(currentPage * ENTRIES_PER_PAGE, total);
+  const startEntry = listTotal === 0 ? 0 : (currentPage - 1) * ENTRIES_PER_PAGE + 1;
+  const endEntry = Math.min(currentPage * ENTRIES_PER_PAGE, listTotal);
 
   return (
     <>
@@ -480,6 +535,22 @@ const PromoCodes = () => {
         <div className="space-y-4">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => <PromoCodeListItemSkeleton key={i} />)
+          ) : isBatchView ? (
+            promoBatches.length === 0 ? (
+              <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-12 text-center">
+                <p className="text-[#71717a] text-sm">{t.promoCodes.noFound}</p>
+              </div>
+            ) : (
+              promoBatches.map((batch, index) => (
+                <PromoCodeBatchCard
+                  key={batch.batch_id}
+                  batch={batch}
+                  index={startEntry + index}
+                  isLoadingCodes={loadingBatchId === batch.batch_id}
+                  onViewCodes={handleViewBatchCodes}
+                />
+              ))
+            )
           ) : filteredPromoCodes.length === 0 ? (
             <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-12 text-center">
               <p className="text-[#71717a] text-sm">{t.promoCodes.noFound}</p>
@@ -506,7 +577,7 @@ const PromoCodes = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
-          summary={<>{t.promoCodes.showing} {startEntry} {t.promoCodes.to} {endEntry} {t.promoCodes.of} {total} {t.promoCodes.entries}</>}
+          summary={<>{t.promoCodes.showing} {startEntry} {t.promoCodes.to} {endEntry} {t.promoCodes.of} {listTotal} {t.promoCodes.entries}</>}
         />
       </div>
 

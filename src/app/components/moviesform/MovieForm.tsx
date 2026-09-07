@@ -1,4 +1,5 @@
 import { useMovieForm } from '../../hooks/useMovieForm';
+import { useLanguage } from '../../context/LanguageContext';
 import { MovieFormProps } from '../../../types/movie';
 import SliderUpload from './SliderUpload';
 import PosterCoverUpload from './PosterCoverUpload';
@@ -24,11 +25,13 @@ const MovieForm = ({
   isSubmitting,
   initialValues,
   initialPreviews,
+  initialSeasons,
   onCancel,
   onSubmit,
   showToast,
 }: MovieFormProps) => {
-  const form = useMovieForm({ initialValues, initialPreviews, showToast, onSubmit });
+  const form = useMovieForm({ initialValues, initialPreviews, initialSeasons, showToast, onSubmit });
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
@@ -60,7 +63,7 @@ const MovieForm = ({
       <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Images Section */}
         <div>
-          <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">រូបភាព (Images)</h2>
+          <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">{t.movies.form.imagesSection}</h2>
 
           <SliderUpload
             sliders={form.sliders}
@@ -113,10 +116,13 @@ const MovieForm = ({
 
         <LanguageQualityFields
           language={form.formData.language}
+          country={form.formData.country}
           quality={form.formData.quality}
           languageError={form.formErrors.language}
+          countryError={form.formErrors.country}
           qualityError={form.formErrors.quality}
           onLanguageChange={(language) => form.setFormData({ ...form.formData, language })}
+          onCountryChange={(country) => form.setFormData({ ...form.formData, country })}
           onQualityChange={(quality) => form.setFormData({ ...form.formData, quality })}
         />
 
@@ -151,12 +157,12 @@ const MovieForm = ({
 
         {/* Video Uploads */}
         <div>
-          <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">វីដេអូ (Videos)</h2>
+          <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">{t.movies.form.videosSection}</h2>
           <div className="space-y-4">
             <VideoUpload
-              label="ឈុតខ្លីៗ (Trailer)"
-              uploadText="Upload Trailer Video"
-              previewLabel="Trailer Preview"
+              label={t.movies.form.trailerLabel}
+              uploadText={t.movies.form.uploadTrailer}
+              previewLabel={t.movies.form.trailerPreview}
               iconColorClass="text-[#3b82f6]"
               file={form.files.trailer}
               preview={form.previews.trailer}
@@ -167,9 +173,9 @@ const MovieForm = ({
 
             {form.formData.uploadType === 'full' && (
               <VideoUpload
-                label="វីដេអូពេញលេញ (Full Movie Video)"
-                uploadText="Upload Full Video"
-                previewLabel="Video Preview"
+                label={t.movies.form.fullVideoLabel}
+                uploadText={t.movies.form.uploadFullVideo}
+                previewLabel={t.movies.form.videoPreview}
                 iconColorClass="text-[#22c55e]"
                 maxPreviewHeight="400px"
                 file={form.files.video}
@@ -183,6 +189,7 @@ const MovieForm = ({
             {form.formData.uploadType === 'series' && (
               <SeasonsEpisodes
                 seasons={form.seasons}
+                isSubmitting={isSubmitting}
                 onAddSeason={form.addSeason}
                 onRemoveSeason={form.removeSeason}
                 onAddEpisode={form.addEpisode}
@@ -190,6 +197,9 @@ const MovieForm = ({
                 onEpisodeThumbnailChange={form.handleEpisodeThumbnailChange}
                 onEpisodeVideoChange={form.handleEpisodeVideoChange}
                 onUpdateEpisodeField={form.updateEpisodeField}
+                onToggleEpisodeFree={form.toggleEpisodeFree}
+                onUnlockAllEpisodes={form.unlockSeasonEpisodes}
+                onLockAllEpisodes={form.lockSeasonEpisodes}
               />
             )}
           </div>
@@ -214,7 +224,7 @@ const MovieForm = ({
             className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#27272a] text-white text-sm font-medium hover:bg-[#3f3f46] transition-colors order-2 sm:order-1"
             disabled={isSubmitting}
           >
-            Cancel
+            {t.common.cancel}
           </button>
           <button
             type="button"

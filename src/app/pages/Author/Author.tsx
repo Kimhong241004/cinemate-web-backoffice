@@ -11,6 +11,7 @@ import {
   Link,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import Pagination from "../../components/shared/Pagination";
 import { authorService } from "../../../api/services/authorService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
@@ -32,7 +33,7 @@ const ITEMS_PER_PAGE = 10;
 const Author = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [selectedStatus, setSelectedStatus] = useState("");
 
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -100,7 +101,10 @@ const Author = () => {
     return () => clearTimeout(timer);
   }, [fetchAuthors]);
 
+  // Skips the initial mount so it doesn't clobber a page number restored from the URL.
+  const isFirstFilterRender = useRef(true);
   useEffect(() => {
+    if (isFirstFilterRender.current) { isFirstFilterRender.current = false; return; }
     setCurrentPage(1);
   }, [searchQuery, selectedStatus]);
 

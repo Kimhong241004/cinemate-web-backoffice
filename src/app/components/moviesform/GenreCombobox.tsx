@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface GenreComboboxProps {
   options: string[];
@@ -14,10 +15,13 @@ const GenreCombobox = ({
   options,
   value,
   onChange,
-  label = 'ប្រភេទរឿង (Genre) *',
+  label,
   error,
-  placeholder = 'Select genres...',
+  placeholder,
 }: GenreComboboxProps) => {
+  const { t } = useLanguage();
+  const resolvedLabel = label ?? `${t.movies.form.genre} *`;
+  const resolvedPlaceholder = placeholder ?? t.movies.form.selectGenres;
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
@@ -74,7 +78,7 @@ const GenreCombobox = ({
 
   return (
     <div ref={containerRef} className="relative">
-      {label && <label className="block text-white text-sm font-medium mb-2">{label}</label>}
+      {resolvedLabel && <label className="block text-white text-sm font-medium mb-2">{resolvedLabel}</label>}
 
       <div
         role="combobox"
@@ -112,7 +116,7 @@ const GenreCombobox = ({
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder={value.length === 0 ? placeholder : ''}
+            placeholder={value.length === 0 ? resolvedPlaceholder : ''}
             className="flex-1 min-w-[100px] bg-transparent text-white placeholder:text-[#52525b] focus:outline-none text-sm"
           />
         </div>
@@ -148,13 +152,13 @@ const GenreCombobox = ({
               })}
             </div>
           ) : (
-            <p className="text-[#71717a] text-sm text-center py-3">No genres match your search</p>
+            <p className="text-[#71717a] text-sm text-center py-3">{t.movies.form.noGenresMatch}</p>
           )}
         </div>
       )}
 
       {error && <p className="text-[#ef4444] text-xs mt-1">{error}</p>}
-      <p className="text-[#71717a] text-xs mt-1">Click to browse, or type to search. Select multiple.</p>
+      <p className="text-[#71717a] text-xs mt-1">{t.movies.form.genreHint}</p>
     </div>
   );
 };

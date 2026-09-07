@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { usePageParam } from '../../hooks/usePageParam';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { Users2, Film, X, Eye, Search, MoreHorizontal, Ban, CheckCircle, Copy } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function Rooms() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RoomStatus | ''>('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [rooms, setRooms] = useState<RoomFromApi[]>([]);
   const [total, setTotal] = useState(0);
   const [activeTotal, setActiveTotal] = useState(0);
@@ -136,14 +137,17 @@ export default function Rooms() {
     }
   };
 
-  // Debounce search input so each keystroke doesn't trigger an API call
+  // Debounce search input so each keystroke doesn't trigger an API call.
+  // Skipped when search already matches debouncedSearch (e.g. on mount) so it
+  // doesn't clobber a page number restored from the URL.
   useEffect(() => {
+    if (search === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, debouncedSearch]);
 
   useEffect(() => {
     fetchRooms();
