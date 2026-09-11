@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus } from "lucide-react";
 import { useNotification } from "../../context/NotificationContext";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
 import StatusFilterDropdown from "../../components/shared/FilterDropdown/StatusFilterDropdown";
@@ -11,8 +12,10 @@ import PromoCodeListItem, {
   PromoCodeListItemSkeleton,
   type PromoCode,
 } from "../../components/promocodes/PromoCodeListItem";
+import PromoCodeBatchCard from "../../components/promocodes/PromoCodeBatchCard";
 import {
   promoCodeService,
+  type PromoCodeBatch,
   type PromoCodeFromApi,
   type PromoCodeType,
 } from "../../../api/services/promoCodeService";
@@ -20,94 +23,6 @@ import {
 type PromoCodeTypeFilter = "all" | "movie" | "subscription";
 
 const ENTRIES_PER_PAGE = 10;
-
-const generateBatchCodes = (prefix: string, count: number, usedCount: number) =>
-  Array.from({ length: count }, (_, i) => ({
-    code: `${prefix}${String(i + 1).padStart(4, "0")}`,
-    used: i < usedCount,
-  }));
-
-const MOCK_PRIVATE_CODES: PromoCode[] = [
-  {
-    globalId: "mock-private-1",
-    id: -1,
-    code: "VIP2026A",
-    description: "Private VIP code for selected users",
-    promoCodeType: ["movie"],
-    status: "active",
-    discountType: "percentage",
-    discountValue: 20,
-    usageCount: 1,
-    usageLimit: 1,
-    expiresAt: "2026-12-31",
-    createdAt: "2026-01-01",
-    visibility: "private",
-    generatedCodes: [
-      { code: "VIP2026A1X9K", used: true },
-      { code: "VIP2026B7M2P", used: false },
-      { code: "VIP2026C3R8Q", used: false },
-      { code: "VIP2026D5T4N", used: true },
-      { code: "VIP2026E9W1L", used: false },
-    ],
-  },
-  {
-    globalId: "mock-private-2",
-    id: -2,
-    code: "STAFF50B",
-    description: "Staff discount — do not share",
-    promoCodeType: ["subscription"],
-    status: "active",
-    discountType: "percentage",
-    discountValue: 50,
-    usageCount: 0,
-    usageLimit: 1,
-    expiresAt: "2026-09-30",
-    createdAt: "2026-01-01",
-    visibility: "private",
-    generatedCodes: [
-      { code: "STAFF50B2K7", used: true },
-      { code: "STAFF50B9M3", used: false },
-      { code: "STAFF50B4Q1", used: false },
-    ],
-  },
-  {
-    globalId: "mock-private-3",
-    id: -3,
-    code: "PRIV10C",
-    description: "Private subscription discount",
-    promoCodeType: ["subscription"],
-    status: "inactive",
-    discountType: "amount",
-    discountValue: 10,
-    usageCount: 0,
-    usageLimit: 1,
-    expiresAt: "2026-08-15",
-    createdAt: "2026-01-01",
-    visibility: "private",
-    generatedCodes: [
-      { code: "PRIV10C8X2", used: false },
-      { code: "PRIV10C1Y5", used: false },
-      { code: "PRIV10C6Z9", used: false },
-      { code: "PRIV10C3A4", used: false },
-    ],
-  },
-  {
-    globalId: "mock-private-4",
-    id: -4,
-    code: "BULK100X",
-    description: "Bulk private batch for partner giveaway",
-    promoCodeType: ["movie"],
-    status: "active",
-    discountType: "percentage",
-    discountValue: 15,
-    usageCount: 32,
-    usageLimit: 1,
-    expiresAt: "2026-11-30",
-    createdAt: "2026-01-01",
-    visibility: "private",
-    generatedCodes: generateBatchCodes("BULK100X-", 100, 32),
-  },
-];
 
 const mapFromApi = (item: PromoCodeFromApi): PromoCode => {
   const isExpired = new Date(item.expires_at) < new Date();
@@ -133,7 +48,7 @@ const mapFromApi = (item: PromoCodeFromApi): PromoCode => {
     usageLimit: item.usage_limit,
     expiresAt: item.expires_at.split("T")[0],
     createdAt: item.created_at.split("T")[0],
-    visibility: "public",
+    visibility: item.visibility,
   };
 };
 
@@ -141,7 +56,7 @@ const PromoCodes = () => {
   const { showToast, addNotification } = useNotification();
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [selectedStatus, setSelectedStatus] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromoCode | null>(null);
@@ -154,12 +69,16 @@ const PromoCodes = () => {
   const [viewCodesPromo, setViewCodesPromo] = useState<PromoCode | null>(null);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [total, setTotal] = useState(0);
+  const [promoBatches, setPromoBatches] = useState<PromoCodeBatch[]>([]);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [loadingBatchId, setLoadingBatchId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<PromoCodeTypeFilter>("all");
   const [selectedVisibility, setSelectedVisibility] = useState("");
   const [selectedDiscount, setSelectedDiscount] = useState("");
 
   const [formData, setFormData] = useState({
     code: "",
+    prefix: "",
     quantity: "",
     description: "",
     promoCodeType: ["movie"] as string[],
@@ -186,18 +105,27 @@ const PromoCodes = () => {
     search: string,
     status: string,
     visibility: string,
+    type: PromoCodeTypeFilter,
+    discount: string,
   ) => {
     setIsLoading(true);
     try {
-      // When the "all" view is active, page 1 makes room for the mock private
-      // codes so every page still shows exactly ENTRIES_PER_PAGE entries total.
-      const mockCount = MOCK_PRIVATE_CODES.length;
-      const reserveMockSlots = visibility === "" && page === 1;
-      const take = reserveMockSlots ? ENTRIES_PER_PAGE - mockCount : ENTRIES_PER_PAGE;
-      const skip =
-        visibility === "" && page > 1
-          ? (page - 1) * ENTRIES_PER_PAGE - mockCount
-          : (page - 1) * ENTRIES_PER_PAGE;
+      const take = ENTRIES_PER_PAGE;
+      const skip = (page - 1) * ENTRIES_PER_PAGE;
+
+      if (visibility === "private") {
+        const res = await promoCodeService.getPromoCodeBatches({
+          skip,
+          take,
+          search: search || undefined,
+        });
+        setPromoBatches(res.data);
+        setBatchTotal(res.total);
+        setPromoCodes([]);
+        setTotal(0);
+        return;
+      }
+
       const apiStatus =
         status === "active" ? 1 : status === "inactive" ? 0 : undefined;
       const res = await promoCodeService.getPromoCodes({
@@ -205,9 +133,14 @@ const PromoCodes = () => {
         take,
         search: search || undefined,
         status: apiStatus,
+        promo_code_type: type === "all" ? undefined : type,
+        discount_type: (discount || undefined) as "percentage" | "amount" | undefined,
+        visibility: (visibility || undefined) as "public" | "private" | undefined,
       });
       setPromoCodes(res.data.map(mapFromApi));
       setTotal(res.total);
+      setPromoBatches([]);
+      setBatchTotal(0);
     } catch {
       showToast("Failed to load promo codes", "error");
     } finally {
@@ -216,32 +149,48 @@ const PromoCodes = () => {
   };
 
   useEffect(() => {
-    fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility);
-  }, [currentPage, searchQuery, selectedStatus, selectedVisibility]);
+    fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount);
+  }, [currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount]);
 
-  // 'expired' has no API-side filter — derive it client-side from the mapped data
-  const allCodes = selectedVisibility === "private"
-    ? MOCK_PRIVATE_CODES
-    : selectedVisibility === ""
-      ? currentPage === 1
-        ? [...promoCodes, ...MOCK_PRIVATE_CODES]
-        : promoCodes
-      : promoCodes;
+  const handleViewBatchCodes = async (batch: PromoCodeBatch) => {
+    setLoadingBatchId(batch.batch_id);
+    try {
+      const res = await promoCodeService.getPromoCodes({
+        batch_id: batch.batch_id,
+        take: batch.codes_count || ENTRIES_PER_PAGE,
+      });
+      setViewCodesPromo({
+        globalId: `batch-${batch.batch_id}`,
+        id: 0,
+        code: batch.description || "Private batch",
+        description: batch.description,
+        promoCodeType: [batch.promo_code_type],
+        status: "active",
+        discountType: batch.discount_type,
+        discountValue: batch.discount_amount,
+        usageCount: 0,
+        usageLimit: batch.usage_limit,
+        expiresAt: batch.expires_at.split("T")[0],
+        createdAt: batch.created_at.split("T")[0],
+        visibility: "private",
+        generatedCodes: res.data.map((c) => ({ code: c.code, used: c.used_count > 0 })),
+      });
+    } catch {
+      showToast("Failed to load batch codes", "error");
+    } finally {
+      setLoadingBatchId(null);
+    }
+  };
 
-  const filteredPromoCodes = allCodes
-    .filter((promo) => selectedStatus !== "expired" || promo.status === "expired")
-    .filter((promo) => selectedType === "all" || promo.promoCodeType.includes(selectedType))
-    .filter((promo) => !selectedDiscount || promo.discountType === selectedDiscount);
+  const isBatchView = selectedVisibility === "private";
 
-  const effectiveTotal = selectedVisibility === "private"
-    ? MOCK_PRIVATE_CODES.length
-    : selectedVisibility === ""
-      ? total + MOCK_PRIVATE_CODES.length
-      : total;
+  // 'expired' has no API-side filter — derive it client-side from the mapped data.
+  const filteredPromoCodes = promoCodes.filter(
+    (promo) => selectedStatus !== "expired" || promo.status === "expired",
+  );
 
-  const totalPages = filteredPromoCodes.length < ENTRIES_PER_PAGE
-    ? currentPage
-    : Math.max(1, Math.ceil(effectiveTotal / ENTRIES_PER_PAGE));
+  const listTotal = isBatchView ? batchTotal : total;
+  const totalPages = Math.max(1, Math.ceil(listTotal / ENTRIES_PER_PAGE));
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -322,22 +271,35 @@ const PromoCodes = () => {
       };
 
       if (!editingPromo && formData.visibility === "private") {
-        const quantity = Number(formData.quantity);
-        const generateCode = () => {
-          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-          const random = Array.from({ length: 6 }, () =>
-            chars[Math.floor(Math.random() * chars.length)],
-          ).join("");
-          return random.toUpperCase();
-        };
-        for (let i = 0; i < quantity; i++) {
-          await promoCodeService.createPromoCode({
-            ...basePayload,
-            code: generateCode(),
-            usage_limit: 1,
-          });
-        }
-        showToast(`${quantity} codes generated`, "success");
+        const result = await promoCodeService.generatePromoCodes({
+          prefix: formData.prefix || undefined,
+          total_promo_code: Number(formData.quantity),
+          description: formData.description,
+          promo_code_type: formData.promoCodeType[0] as PromoCodeType,
+          discount_amount: Number(formData.discountValue),
+          discount_type: formData.discountType,
+          expires_at: new Date(formData.expiresAt).toISOString(),
+          usage_limit: 1,
+          max_uses_per_user: 1,
+          visibility: "private",
+        });
+        showToast(`${result.total_generated} codes generated`, "success");
+        setViewCodesPromo({
+          globalId: `generated-${result.data[0]?.global_id ?? "batch"}`,
+          id: 0,
+          code: formData.prefix || "Generated batch",
+          description: formData.description,
+          promoCodeType: formData.promoCodeType,
+          status: formData.status,
+          discountType: formData.discountType,
+          discountValue: Number(formData.discountValue),
+          usageCount: 0,
+          usageLimit: 1,
+          expiresAt: formData.expiresAt,
+          createdAt: new Date().toISOString().split("T")[0],
+          visibility: "private",
+          generatedCodes: result.data.map((c) => ({ code: c.code, used: c.used_count > 0 })),
+        });
       } else if (editingPromo) {
         await promoCodeService.updatePromoCode(editingPromo.globalId, {
           ...basePayload,
@@ -355,7 +317,7 @@ const PromoCodes = () => {
       }
 
       handleCloseModal();
-      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility);
+      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
@@ -370,6 +332,7 @@ const PromoCodes = () => {
       setEditingPromo(promo);
       setFormData({
         code: promo.code,
+        prefix: "",
         quantity: "",
         description: promo.description,
         promoCodeType: promo.promoCodeType as string[],
@@ -385,6 +348,7 @@ const PromoCodes = () => {
       setEditingPromo(null);
       setFormData({
         code: "",
+        prefix: "",
         quantity: "",
         description: "",
         promoCodeType: ["movie"],
@@ -413,6 +377,7 @@ const PromoCodes = () => {
     setEditingPromo(null);
     setFormData({
       code: "",
+      prefix: "",
       quantity: "",
       description: "",
       promoCodeType: ["movie"],
@@ -446,7 +411,7 @@ const PromoCodes = () => {
         "success",
       );
       setDeletePromo(null);
-      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility);
+      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
@@ -471,7 +436,7 @@ const PromoCodes = () => {
         "success",
       );
       setToggleConfirmPromo(null);
-      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility);
+      fetchPromoCodes(currentPage, searchQuery, selectedStatus, selectedVisibility, selectedType, selectedDiscount);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       showToast(message, "error");
@@ -480,8 +445,8 @@ const PromoCodes = () => {
     }
   };
 
-  const startEntry = total === 0 ? 0 : (currentPage - 1) * ENTRIES_PER_PAGE + 1;
-  const endEntry = Math.min(currentPage * ENTRIES_PER_PAGE, total);
+  const startEntry = listTotal === 0 ? 0 : (currentPage - 1) * ENTRIES_PER_PAGE + 1;
+  const endEntry = Math.min(currentPage * ENTRIES_PER_PAGE, listTotal);
 
   return (
     <>
@@ -570,6 +535,22 @@ const PromoCodes = () => {
         <div className="space-y-4">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => <PromoCodeListItemSkeleton key={i} />)
+          ) : isBatchView ? (
+            promoBatches.length === 0 ? (
+              <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-12 text-center">
+                <p className="text-[#71717a] text-sm">{t.promoCodes.noFound}</p>
+              </div>
+            ) : (
+              promoBatches.map((batch, index) => (
+                <PromoCodeBatchCard
+                  key={batch.batch_id}
+                  batch={batch}
+                  index={startEntry + index}
+                  isLoadingCodes={loadingBatchId === batch.batch_id}
+                  onViewCodes={handleViewBatchCodes}
+                />
+              ))
+            )
           ) : filteredPromoCodes.length === 0 ? (
             <div className="bg-[#18181b] border border-[#27272a] rounded-2xl p-12 text-center">
               <p className="text-[#71717a] text-sm">{t.promoCodes.noFound}</p>
@@ -596,7 +577,7 @@ const PromoCodes = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
-          summary={<>{t.promoCodes.showing} {startEntry} {t.promoCodes.to} {endEntry} {t.promoCodes.of} {total} {t.promoCodes.entries}</>}
+          summary={<>{t.promoCodes.showing} {startEntry} {t.promoCodes.to} {endEntry} {t.promoCodes.of} {listTotal} {t.promoCodes.entries}</>}
         />
       </div>
 

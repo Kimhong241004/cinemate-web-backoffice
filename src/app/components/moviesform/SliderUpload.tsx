@@ -1,6 +1,7 @@
 import { RefObject } from 'react';
 import { Upload, X } from 'lucide-react';
 import { SliderImage } from '../../../types/movie';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface SliderUploadProps {
   sliders: SliderImage[];
@@ -9,10 +10,12 @@ interface SliderUploadProps {
   onRemove: (sliderId: number) => void;
 }
 
-const SliderUpload = ({ sliders, inputRef, onFileChange, onRemove }: SliderUploadProps) => (
+const SliderUpload = ({ sliders, inputRef, onFileChange, onRemove }: SliderUploadProps) => {
+  const { t } = useLanguage();
+  return (
   <div className="mb-4">
     <label className="block text-white text-sm font-medium mb-2">
-      រូបភាពស្លាយ (Slider Images)
+      {t.movies.form.sliderImages}
     </label>
     {sliders.length > 0 && (
       <div className="flex flex-wrap gap-3 mb-3">
@@ -34,10 +37,11 @@ const SliderUpload = ({ sliders, inputRef, onFileChange, onRemove }: SliderUploa
       className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-[#27272a] hover:border-[#3f3f46] rounded-lg cursor-pointer transition-colors px-4 py-2.5"
     >
       <Upload className="w-4 h-4 text-[#71717a]" />
-      <p className="text-white text-sm font-medium">Upload Slider</p>
+      <p className="text-white text-sm font-medium">{t.movies.form.uploadSlider}</p>
     </div>
     <input ref={inputRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
   </div>
-);
+  );
+};
 
 export default SliderUpload;

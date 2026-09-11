@@ -1,22 +1,24 @@
-type AccessType = 'buy' | 'membership' | 'free';
+import { useLanguage } from '../../context/LanguageContext';
 
-const accessTypeOptions: { value: AccessType; label: string }[] = [
-  { value: 'buy', label: 'Buy' },
-  { value: 'membership', label: 'Membership' },
-  { value: 'free', label: 'Free' },
-];
+type AccessType = 'buy' | 'membership' | 'free';
 
 interface AccessTypeSelectorProps {
   accessType: AccessType[];
-  freeEpisodeCount: string;
   onToggle: (type: AccessType) => void;
-  onFreeEpisodeCountChange: (value: string) => void;
 }
 
-const AccessTypeSelector = ({ accessType, freeEpisodeCount, onToggle, onFreeEpisodeCountChange }: AccessTypeSelectorProps) => (
+const AccessTypeSelector = ({ accessType, onToggle }: AccessTypeSelectorProps) => {
+  const { t } = useLanguage();
+  const accessTypeOptions: { value: AccessType; label: string }[] = [
+    { value: 'buy', label: t.movies.form.accessBuy },
+    { value: 'membership', label: t.movies.form.accessMembership },
+    { value: 'free', label: t.movies.form.accessFree },
+  ];
+
+  return (
   <div>
     <label className="block text-white text-sm font-medium mb-2">
-      ប្រភេទចូលប្រើ (Access Type) *
+      {t.movies.form.accessType} *
     </label>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       {accessTypeOptions.map((opt) => (
@@ -32,24 +34,8 @@ const AccessTypeSelector = ({ accessType, freeEpisodeCount, onToggle, onFreeEpis
         </button>
       ))}
     </div>
-
-    {accessType.includes('free') && (
-      <div className="mt-3 max-w-xs">
-        <label className="block text-white text-sm font-medium mb-2">
-          ចំនួនភាគឥតគិតថ្លៃ (Free Episodes)
-        </label>
-        <input
-          type="number"
-          value={freeEpisodeCount}
-          onChange={(e) => onFreeEpisodeCountChange(e.target.value)}
-          className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
-          placeholder="e.g. 3"
-          min="0"
-        />
-        <p className="text-[#71717a] text-xs mt-1">Number of first episodes that are free to watch</p>
-      </div>
-    )}
   </div>
-);
+  );
+};
 
 export default AccessTypeSelector;

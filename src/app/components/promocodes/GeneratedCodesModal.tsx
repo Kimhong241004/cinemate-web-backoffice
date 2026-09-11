@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, Copy, Download, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, ChevronDown, Copy, Download, X } from "lucide-react";
 import type { PromoCode } from "./PromoCodeListItem";
 
 interface GeneratedCodesModalProps {
@@ -9,12 +9,21 @@ interface GeneratedCodesModalProps {
   onCopyCode: (code: string) => void;
 }
 
+const COLLAPSED_COUNT = 1;
+
 const GeneratedCodesModal = ({ isOpen, promo, onClose, onCopyCode }: GeneratedCodesModalProps) => {
   const [copiedAll, setCopiedAll] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setShowAll(false);
+  }, [isOpen]);
 
   if (!isOpen || !promo) return null;
 
   const codes = promo.generatedCodes ?? [];
+  const visibleCodes = showAll ? codes : codes.slice(0, COLLAPSED_COUNT);
+  const remaining = codes.length - visibleCodes.length;
 
   const handleCopyAll = () => {
     navigator.clipboard.writeText(codes.map((c) => c.code).join("\n"));
@@ -63,7 +72,7 @@ const GeneratedCodesModal = ({ isOpen, promo, onClose, onCopyCode }: GeneratedCo
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
-          {codes.map(({ code, used }) => (
+          {visibleCodes.map(({ code, used }) => (
             <div
               key={code}
               className="flex items-center justify-between gap-2 bg-[#0a0a0a] border border-[#27272a] rounded-lg px-3 py-2"
@@ -86,6 +95,25 @@ const GeneratedCodesModal = ({ isOpen, promo, onClose, onCopyCode }: GeneratedCo
               </div>
             </div>
           ))}
+
+          {remaining > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[#3f3f46] text-[#a1a1aa] text-sm font-medium hover:bg-[#27272a] hover:text-white transition-colors"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              View {remaining} more code{remaining === 1 ? "" : "s"}
+            </button>
+          )}
+
+          {showAll && codes.length > COLLAPSED_COUNT && (
+            <button
+              onClick={() => setShowAll(false)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[#71717a] text-xs font-medium hover:text-white transition-colors"
+            >
+              Show less
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-[#27272a]">

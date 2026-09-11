@@ -26,6 +26,7 @@ export interface CreateAdminPayload {
   email: string;
   password: string;
   profile_url?: string;
+  role?: string;
   status?: number;
 }
 
@@ -34,14 +35,24 @@ export interface UpdateAdminPayload {
   email?: string;
   password?: string;
   profile_url?: string;
+  role?: string;
   status?: number;
 }
 
+export interface GetAdminsParams {
+  skip?: number;
+  take?: number;
+  search?: string;
+  status?: 0 | 1;
+}
+
 export const adminService = {
-  getAdmins: (skip = 0, take = 10) =>
-    apiClient<GetAdminsResponse>('/v1/admins', {
-      params: { skip: String(skip), take: String(take) },
-    }),
+  getAdmins: ({ skip = 0, take = 10, search, status }: GetAdminsParams = {}) => {
+    const params: Record<string, string> = { skip: String(skip), take: String(take) };
+    if (search) params.search = search;
+    if (status !== undefined) params.status = String(status);
+    return apiClient<GetAdminsResponse>('/v1/admins', { params });
+  },
 
   createAdmin: (payload: CreateAdminPayload) =>
     apiClient<AdminFromApi>('/v1/admins', {

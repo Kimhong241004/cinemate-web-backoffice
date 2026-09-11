@@ -1,34 +1,37 @@
 import { Check, Search, X } from 'lucide-react';
-import { Author } from '../../../types/movie';
+import { AuthorFromApi } from '../../../api/services/authorService';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AuthorsSelectorProps {
-  selectedAuthors: Author[];
-  filteredAuthors: Author[];
-  selectedAuthorIds: number[];
+  selectedAuthors: AuthorFromApi[];
+  filteredAuthors: AuthorFromApi[];
+  selectedAuthorIds: string[];
   authorSearch: string;
   showDropdown: boolean;
   onSearchChange: (value: string) => void;
   onFocus: () => void;
-  onSelectAuthor: (authorId: number) => void;
-  onRemoveAuthor: (authorId: number) => void;
+  onSelectAuthor: (authorId: string) => void;
+  onRemoveAuthor: (authorId: string) => void;
 }
 
 const AuthorsSelector = ({
   selectedAuthors, filteredAuthors, selectedAuthorIds, authorSearch, showDropdown,
   onSearchChange, onFocus, onSelectAuthor, onRemoveAuthor,
-}: AuthorsSelectorProps) => (
+}: AuthorsSelectorProps) => {
+  const { t } = useLanguage();
+  return (
   <div className="relative">
     <label className="block text-white text-sm font-medium mb-2">
-      តួអង្គ (Cast/Authors)
+      {t.movies.form.castAuthors}
     </label>
 
     {selectedAuthors.length > 0 && (
       <div className="flex flex-wrap gap-2 mb-2">
         {selectedAuthors.map((author) => (
-          <span key={author.id} className="inline-flex items-center gap-2 pl-1 pr-3 py-1 bg-[#3b82f6] text-white text-sm rounded-lg">
-            <img src={author.profile} alt={author.name} className="w-6 h-6 rounded-full object-cover" />
+          <span key={author.global_id} className="inline-flex items-center gap-2 pl-1 pr-3 py-1 bg-[#3b82f6] text-white text-sm rounded-lg">
+            <img src={author.profile_url} alt={author.name} className="w-6 h-6 rounded-full object-cover" />
             {author.name}
-            <button type="button" onClick={() => onRemoveAuthor(author.id)} className="hover:text-[#ef4444] transition-colors">
+            <button type="button" onClick={() => onRemoveAuthor(author.global_id)} className="hover:text-[#ef4444] transition-colors">
               <X className="w-3.5 h-3.5" />
             </button>
           </span>
@@ -43,7 +46,7 @@ const AuthorsSelector = ({
         onChange={(e) => onSearchChange(e.target.value)}
         onFocus={onFocus}
         className="w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] pl-10 pr-4 py-2.5 rounded-lg border border-[#27272a] focus:outline-none focus:border-[#3f3f46] transition-colors text-sm"
-        placeholder="Search authors..."
+        placeholder={t.movies.form.searchAuthors}
       />
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#52525b]" />
     </div>
@@ -53,28 +56,29 @@ const AuthorsSelector = ({
         {filteredAuthors.length > 0 ? (
           filteredAuthors.map((author) => (
             <button
-              key={author.id}
+              key={author.global_id}
               type="button"
-              onClick={() => onSelectAuthor(author.id)}
+              onClick={() => onSelectAuthor(author.global_id)}
               className={`w-full text-left px-4 py-2.5 hover:bg-[#27272a] transition-colors ${
-                selectedAuthorIds.includes(author.id) ? 'bg-[#27272a] text-[#3b82f6]' : 'text-white'
+                selectedAuthorIds.includes(author.global_id) ? 'bg-[#27272a] text-[#3b82f6]' : 'text-white'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <img src={author.profile} alt={author.name} className="w-8 h-8 rounded-full object-cover" />
+                  <img src={author.profile_url} alt={author.name} className="w-8 h-8 rounded-full object-cover" />
                   <span className="text-sm">{author.name}</span>
                 </div>
-                {selectedAuthorIds.includes(author.id) && <Check className="w-4 h-4" />}
+                {selectedAuthorIds.includes(author.global_id) && <Check className="w-4 h-4" />}
               </div>
             </button>
           ))
         ) : (
-          <div className="px-4 py-3 text-[#71717a] text-sm">No authors found</div>
+          <div className="px-4 py-3 text-[#71717a] text-sm">{t.movies.form.noAuthorsFound}</div>
         )}
       </div>
     )}
   </div>
-);
+  );
+};
 
 export default AuthorsSelector;

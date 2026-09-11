@@ -1,3 +1,6 @@
+import SelectField from './SelectField';
+import { useLanguage } from '../../context/LanguageContext';
+
 interface BasicInfoFieldsProps {
   title: string;
   releaseYear: string;
@@ -15,13 +18,15 @@ interface BasicInfoFieldsProps {
 const BasicInfoFields = ({
   title, releaseYear, uploadType, price, episodePrice, yearOptions, errors,
   onTitleChange, onReleaseYearChange, onPriceChange, onEpisodePriceChange,
-}: BasicInfoFieldsProps) => (
+}: BasicInfoFieldsProps) => {
+  const { t } = useLanguage();
+  return (
   <div>
-    <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">ព័ត៌មានមូលដ្ឋាន (Basic Information)</h2>
+    <h2 className="text-white text-base sm:text-lg font-bold mb-3 sm:mb-4">{t.movies.form.basicInfo}</h2>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="sm:col-span-2">
         <label className="block text-white text-sm font-medium mb-2">
-          ចំណងជើងភាពយន្ត (Movie Title) *
+          {t.movies.form.movieTitleLabel} *
         </label>
         <input
           type="text"
@@ -30,26 +35,20 @@ const BasicInfoFields = ({
           className={`w-full bg-[#0a0a0a] text-white placeholder:text-[#52525b] px-4 py-2.5 rounded-lg border ${
             errors.title ? 'border-[#ef4444]' : 'border-[#27272a]'
           } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-          placeholder="Enter movie title"
+          placeholder={t.movies.form.movieTitlePlaceholder}
         />
         {errors.title && <p className="text-[#ef4444] text-xs mt-1">{errors.title}</p>}
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-white text-sm font-medium mb-2">
-          ឆ្នាំចេញផ្សាយ (Release Year) *
-        </label>
-        <select
+        <SelectField
+          label={`${t.movies.form.releaseYear} *`}
+          placeholder={t.movies.form.selectYear}
+          options={yearOptions.map(String)}
           value={releaseYear}
-          onChange={(e) => onReleaseYearChange(e.target.value)}
-          className={`w-full bg-[#0a0a0a] text-white px-4 py-2.5 rounded-lg border ${
-            errors.releaseYear ? 'border-[#ef4444]' : 'border-[#27272a]'
-          } focus:outline-none focus:border-[#3f3f46] transition-colors text-sm`}
-        >
-          <option value="">Select year</option>
-          {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
-        </select>
-        {errors.releaseYear && <p className="text-[#ef4444] text-xs mt-1">{errors.releaseYear}</p>}
+          onChange={onReleaseYearChange}
+          error={errors.releaseYear}
+        />
       </div>
 
       <div className="sm:col-span-2">
@@ -57,7 +56,7 @@ const BasicInfoFields = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-white text-sm font-medium mb-2">
-                តម្លៃសម្រាប់ស៊េរីទាំងអស់ (Full Series Price) *
+                {t.movies.form.fullSeriesPrice} *
               </label>
               <input
                 type="number"
@@ -74,7 +73,7 @@ const BasicInfoFields = ({
             </div>
             <div>
               <label className="block text-white text-sm font-medium mb-2">
-                តម្លៃក្នុងមួយភាគ (Price per Episode)
+                {t.movies.form.pricePerEpisode}
               </label>
               <input
                 type="number"
@@ -90,7 +89,7 @@ const BasicInfoFields = ({
         ) : (
           <div>
             <label className="block text-white text-sm font-medium mb-2">
-              តម្លៃសម្រាប់ទិញ (Price) *
+              {t.movies.form.priceLabel} *
             </label>
             <input
               type="number"
@@ -109,6 +108,7 @@ const BasicInfoFields = ({
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default BasicInfoFields;

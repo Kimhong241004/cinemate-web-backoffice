@@ -1,8 +1,10 @@
 import { RefObject } from 'react';
 import { Upload, X } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ImageDropzoneProps {
   label: string;
+  uploadText: string;
   hint: string;
   preview: string;
   error: string;
@@ -11,7 +13,7 @@ interface ImageDropzoneProps {
   onRemove: () => void;
 }
 
-const ImageDropzone = ({ label, hint, preview, error, inputRef, onChange, onRemove }: ImageDropzoneProps) => (
+const ImageDropzone = ({ label, uploadText, hint, preview, error, inputRef, onChange, onRemove }: ImageDropzoneProps) => (
   <div>
     <label className="block text-white text-sm font-medium mb-2">{label}</label>
     <div
@@ -33,7 +35,7 @@ const ImageDropzone = ({ label, hint, preview, error, inputRef, onChange, onRemo
       ) : (
         <div className="flex flex-col items-center justify-center h-full p-4 text-center">
           <Upload className="w-8 h-8 text-[#71717a] mb-2" />
-          <p className="text-white text-sm font-medium mb-1">Upload {label.includes('Poster') ? 'Poster' : 'Cover'}</p>
+          <p className="text-white text-sm font-medium mb-1">{uploadText}</p>
           <p className="text-[#71717a] text-xs">{hint}</p>
         </div>
       )}
@@ -59,11 +61,14 @@ interface PosterCoverUploadProps {
 const PosterCoverUpload = ({
   posterPreview, coverPreview, posterError, coverError,
   posterInputRef, coverInputRef, onPosterChange, onCoverChange, onRemovePoster, onRemoveCover,
-}: PosterCoverUploadProps) => (
+}: PosterCoverUploadProps) => {
+  const { t } = useLanguage();
+  return (
   <>
     <ImageDropzone
-      label="រូបភាព​បញ្ឈរ (Poster - Vertical) *"
-      hint="2:3 ratio"
+      label={`${t.movies.form.posterLabel} *`}
+      uploadText={t.movies.form.uploadPoster}
+      hint={t.movies.form.posterHint}
       preview={posterPreview}
       error={posterError}
       inputRef={posterInputRef}
@@ -71,8 +76,9 @@ const PosterCoverUpload = ({
       onRemove={onRemovePoster}
     />
     <ImageDropzone
-      label="រូបភាព​ផ្តេក (Cover - Horizontal) *"
-      hint="16:9 ratio"
+      label={`${t.movies.form.coverLabel} *`}
+      uploadText={t.movies.form.uploadCover}
+      hint={t.movies.form.coverHint}
       preview={coverPreview}
       error={coverError}
       inputRef={coverInputRef}
@@ -80,6 +86,7 @@ const PosterCoverUpload = ({
       onRemove={onRemoveCover}
     />
   </>
-);
+  );
+};
 
 export default PosterCoverUpload;

@@ -7,6 +7,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePageParam } from "../../hooks/usePageParam";
 import { userService, UserFromApi } from "../../../api/services/userService";
 import ConfirmDialog from "../../components/shared/ConfirmDialog";
 import Pagination from "../../components/shared/Pagination";
@@ -28,7 +29,7 @@ const formatDate = (dateStr: string | null) => {
 
 const UserManagement = () => {
   const { t } = useLanguage();
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
@@ -54,27 +55,33 @@ const UserManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debounce search input
+  // Debounce search input. Skipped when searchQuery already matches
+  // debouncedSearch (e.g. on mount) so it doesn't clobber a page number
+  // restored from the URL.
   useEffect(() => {
+    if (searchQuery === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, debouncedSearch]);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Omitting user_type returns every account type, including guests
-      // (the API rejects user_type=guest as an explicit filter value, so
-      // "Guest" is still filtered client-side on the current page below).
+      // Omitting user_type returns every account type, including guests.
       // Creators are excluded here since they're managed on their own page.
       const res = await userService.getUsers({
         page: currentPage,
         take: ITEMS_PER_PAGE,
         search: debouncedSearch || undefined,
-        user_type: accountTypeFilter === "registered" ? "regular" : undefined,
+        user_type:
+          accountTypeFilter === "registered"
+            ? "regular"
+            : accountTypeFilter === "guest"
+              ? "guest"
+              : undefined,
       });
       const usersWithAccountType: UserFromApi[] = res.data
         .filter((user) => user.user_type !== "creator")
@@ -141,16 +148,11 @@ const UserManagement = () => {
     }
   };
 
-  // Client-side status filter (API doesn't support a status param) and guest
-  // filter (API rejects user_type=guest, so this only narrows the current page —
-  // "registered" is filtered server-side via user_type=regular instead, see fetchUsers).
+  // Client-side status filter only — the API has no status query param.
+  // Account type (registered/guest) is filtered server-side, see fetchUsers.
   const filteredUsers = users.filter((user) => {
     if (statusFilter === "active" && user.status !== 1) return false;
     if (statusFilter === "suspended" && user.status !== 0) return false;
-    if (accountTypeFilter === "guest") {
-      const userAccountType = user.account_type ?? 'guest';
-      if (userAccountType !== "guest") return false;
-    }
     return true;
   });
 
@@ -202,7 +204,7 @@ const UserManagement = () => {
             }}
             options={[
               { value: "guest", label: "Guest" },
-              { value: "registered", label: "Registered" },
+              { value: "registered", label: "Regular" },
             ]}
           />
 
@@ -327,7 +329,7 @@ const UserManagement = () => {
                       const type = user.account_type ?? 'guest';
                       const config = {
                         guest:          { label: 'Guest',          cls: 'bg-[#27272a] text-[#71717a] border border-[#3f3f46]' },
-                        registered:     { label: 'Registered',     cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+                        registered:     { label: 'Regular',        cls: 'bg-green-500/10 text-green-400 border border-green-500/20' },
                       }[type];
                       return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${config.cls}`}>{config.label}</span>;
                     })()}

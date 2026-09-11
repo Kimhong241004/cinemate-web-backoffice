@@ -9,6 +9,7 @@ import {
   Radio as RadioIcon,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import { usePageParam } from "../hooks/usePageParam";
 import {
   radioService,
   RadioChannelFromApi,
@@ -43,7 +44,7 @@ const Radio = () => {
   // ── data state ────────────────────────────────────────────────────────────
   const [stations, setStations] = useState<RadioChannelFromApi[]>([]);
   const [total, setTotal] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = usePageParam();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
