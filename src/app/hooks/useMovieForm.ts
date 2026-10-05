@@ -3,6 +3,7 @@ import { defaultMovieFormErrors, defaultMovieFormValues, getYearOptions } from '
 import { Episode, MovieFormFiles, MovieFormValues, Season, SliderImage } from '../../types/movie';
 import { movieService, GenreFromApi } from '../../api/services/movieService';
 import { authorService, AuthorFromApi } from '../../api/services/authorService';
+import { useLanguage } from '../context/LanguageContext';
 
 interface UseMovieFormOptions {
   initialValues?: Partial<MovieFormValues>;
@@ -19,6 +20,7 @@ interface UseMovieFormOptions {
 }
 
 export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, showToast, onSubmit }: UseMovieFormOptions) => {
+  const { t } = useLanguage();
   const posterInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const trailerInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +44,9 @@ export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, s
 
   const [seasons, setSeasons] = useState<Season[]>(() => initialSeasons ?? []);
   const [sliders, setSliders] = useState<SliderImage[]>([]);
+  const [reorderingSeasonId, setReorderingSeasonId] = useState<number | null>(null);
+  const [reorderOriginalIds, setReorderOriginalIds] = useState<number[]>([]);
+  const [isSavingEpisodeOrder, setIsSavingEpisodeOrder] = useState(false);
   const [isGeneratingKeywords, setIsGeneratingKeywords] = useState(false);
 
   const [formErrors, setFormErrors] = useState(defaultMovieFormErrors);
@@ -326,6 +331,80 @@ export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, s
   const unlockSeasonEpisodes = (seasonId: number) => setSeasonEpisodesLock(seasonId, false);
   const lockSeasonEpisodes = (seasonId: number) => setSeasonEpisodesLock(seasonId, true);
 
+  // Reorder mode is one season at a time. Dragging only moves cards in the array; each
+  // episode keeps its episodeNumber until "Save Order", so an unsaved drag never changes
+  // which server row a later movie update writes a title to.
+  const startReorder = (seasonId: number) => {
+    const season = seasons.find(s => s.id === seasonId);
+    if (!season) return;
+    setReorderingSeasonId(seasonId);
+    setReorderOriginalIds(season.episodes.map(ep => ep.id));
+  };
+
+  const cancelReorder = () => {
+    const seasonId = reorderingSeasonId;
+    const originalIds = reorderOriginalIds;
+    setSeasons(prev => prev.map(season => {
+      if (season.id !== seasonId) return season;
+      const rank = new Map(originalIds.map((id, i) => [id, i]));
+      return {
+        ...season,
+        episodes: [...season.episodes].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity)),
+      };
+    }));
+    setReorderingSeasonId(null);
+  };
+
+  // Dropping one episode on another swaps just those two positions (5 → 3 makes 3 → 5);
+  // every other episode keeps its place.
+  const swapEpisodes = (seasonId: number, fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setSeasons(prev => prev.map(season => {
+      if (season.id !== seasonId) return season;
+      const episodes = [...season.episodes];
+      [episodes[fromIndex], episodes[toIndex]] = [episodes[toIndex], episodes[fromIndex]];
+      return { ...season, episodes };
+    }));
+  };
+
+  // A season that exists on the server is renumbered through the reorder endpoint; a
+  // season not created yet just renumbers locally, and the new numbers go out on submit.
+  const saveEpisodeOrder = async (seasonId: number) => {
+    const season = seasons.find(s => s.id === seasonId);
+    if (!season) return;
+
+    if (!season.globalId) {
+      setSeasons(prev => prev.map(s => (
+        s.id === seasonId ? { ...s, episodes: s.episodes.map((ep, i) => ({ ...ep, episodeNumber: i + 1 })) } : s
+      )));
+      setReorderingSeasonId(null);
+      return;
+    }
+
+    // The endpoint needs every episode of the season, so unsaved ones must be created first.
+    if (season.episodes.some(ep => !ep.globalId)) {
+      showToast(t.movies.form.saveNewEpisodesBeforeReorder, 'error');
+      return;
+    }
+
+    setIsSavingEpisodeOrder(true);
+    try {
+      const res = await movieService.reorderEpisodes(season.globalId, season.episodes.map(ep => ep.globalId!));
+      const numberById = new Map(res.episodes.map(ep => [ep.global_id, ep.episode_number]));
+      setSeasons(prev => prev.map(s => (
+        s.id === seasonId
+          ? { ...s, episodes: s.episodes.map(ep => ({ ...ep, episodeNumber: numberById.get(ep.globalId!) ?? ep.episodeNumber })) }
+          : s
+      )));
+      setReorderingSeasonId(null);
+      showToast(t.movies.form.episodeOrderSaved, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t.movies.form.failedSaveEpisodeOrder, 'error');
+    } finally {
+      setIsSavingEpisodeOrder(false);
+    }
+  };
+
   const isFormValid = () => {
     if (!formData.title.trim()) return false;
     if (!formData.releaseYear.trim() || !/^\d{4}$/.test(formData.releaseYear)) return false;
@@ -421,6 +500,12 @@ export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, s
     toggleEpisodeFree,
     unlockSeasonEpisodes,
     lockSeasonEpisodes,
+    reorderingSeasonId,
+    isSavingEpisodeOrder,
+    startReorder,
+    cancelReorder,
+    swapEpisodes,
+    saveEpisodeOrder,
     isFormValid,
     handleSubmit,
   };

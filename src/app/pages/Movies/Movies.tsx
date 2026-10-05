@@ -419,6 +419,11 @@ const Movies = () => {
               const movieUploads     = getUploadsForMovie(movie.global_id);
               const activeUpload     = movieUploads.find((u) => u.target === 'movie' && u.status !== 'error')
                 ?? movieUploads.find((u) => u.target === 'trailer' && u.status !== 'error');
+              // Latest non-failed upload per target, so a trailer and full video uploading
+              // together each get their own progress bar.
+              const visibleUploads = (['trailer', 'movie'] as const)
+                .map((target) => [...movieUploads].reverse().find((u) => u.target === target && u.status !== 'error'))
+                .filter((u): u is BackgroundUpload => Boolean(u));
               const convertingStatus = activeUpload?.status === 'converting'
                 ? getVideoStatusDisplay(activeUpload.convertStatus) ?? { dot: 'bg-[#eab308]', badgeCls: 'bg-[#eab308]/20 text-[#eab308]', label: 'Converting', terminal: false }
                 : null;
@@ -522,22 +527,30 @@ const Movies = () => {
 
                   {/* Upload Status — file transfer, not transcoding */}
                   <Td>
-                    {activeUpload ? (
-                      <div className="w-32">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs font-medium ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
-                            {activeUpload.status === 'converting' ? 'Completed' : uploadPhaseLabel[activeUpload.status]}
-                          </span>
-                          <span className={`text-xs font-semibold ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
-                            {activeUpload.status === 'converting' ? 100 : Math.min(activeUpload.progress, 100)}%
-                          </span>
-                        </div>
-                        <div className={`w-full h-2 rounded-full overflow-hidden ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'bg-[#22c55e]/20' : 'bg-[#3b82f6]/20'}`}>
-                          <div
-                            className={`h-full rounded-full transition-all ${activeUpload.status === 'completed' || activeUpload.status === 'converting' ? 'bg-[#22c55e]' : 'bg-[#3b82f6]'}`}
-                            style={{ width: `${activeUpload.status === 'converting' ? 100 : Math.min(activeUpload.progress, 100)}%` }}
-                          />
-                        </div>
+                    {visibleUploads.length > 0 ? (
+                      <div className="w-36 space-y-2">
+                        {visibleUploads.map((upload) => {
+                          const done = upload.status === 'completed' || upload.status === 'converting';
+                          const pct = done ? 100 : Math.min(upload.progress, 100);
+                          return (
+                            <div key={upload.id}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`text-xs font-medium ${done ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                                  {upload.target === 'trailer' ? t.movies.form.trailerLabel : 'Movie'} · {upload.status === 'converting' ? 'Completed' : uploadPhaseLabel[upload.status]}
+                                </span>
+                                <span className={`text-xs font-semibold ${done ? 'text-[#22c55e]' : 'text-[#3b82f6]'}`}>
+                                  {pct}%
+                                </span>
+                              </div>
+                              <div className={`w-full h-2 rounded-full overflow-hidden ${done ? 'bg-[#22c55e]/20' : 'bg-[#3b82f6]/20'}`}>
+                                <div
+                                  className={`h-full rounded-full transition-all ${done ? 'bg-[#22c55e]' : 'bg-[#3b82f6]'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : uploadStatusDisplay ? (
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${uploadStatusDisplay.badgeCls}`}>

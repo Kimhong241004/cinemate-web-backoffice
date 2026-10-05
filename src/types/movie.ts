@@ -97,4 +97,13 @@ export interface MovieFormProps {
     sliders: SliderImage[]
   ) => void;
   showToast: (message: string, type: 'success' | 'error') => void;
+  /** In-flight trailer/full-video uploads started by this submit, shown under each video input. */
+  videoUploads?: { trailer?: VideoUploadProgress; video?: VideoUploadProgress };
+}
+
+export interface VideoUploadProgress {
+  progress: number;
+  status: 'uploading' | 'finalizing' | 'attaching' | 'converting' | 'completed' | 'error';
+  convertStatus?: string;
+  error?: string;
 }

@@ -15,7 +15,8 @@ export interface BackgroundUpload {
 
 interface UploadManagerContextType {
   uploads: BackgroundUpload[];
-  startBackgroundUpload: (movieGlobalId: string, target: UploadTarget, file: File) => void;
+  /** Returns the upload's id so the caller can follow its progress in `uploads`. */
+  startBackgroundUpload: (movieGlobalId: string, target: UploadTarget, file: File) => string;
   getUploadsForMovie: (movieGlobalId: string) => BackgroundUpload[];
   dismissUpload: (id: string) => void;
 }
@@ -37,8 +38,9 @@ export const UploadManagerProvider = ({ children }: { children: ReactNode }) => 
 
     (async () => {
       try {
-        const uploadGlobalId = await movieService.uploadFileInChunks(target, file, (pct) => {
-          updateUpload(id, { progress: pct, status: pct >= 100 ? 'finalizing' : 'uploading' });
+        const uploadGlobalId = await movieService.uploadFileInChunks(target, file, {
+          // 99 = every byte sent, waiting on completeUpload to stitch the parts together.
+          onProgress: (pct) => updateUpload(id, { progress: pct, status: pct >= 99 ? 'finalizing' : 'uploading' }),
         });
         updateUpload(id, { status: 'attaching', progress: 100 });
         await movieService.updateMovie(movieGlobalId, target === 'trailer'
@@ -51,6 +53,7 @@ export const UploadManagerProvider = ({ children }: { children: ReactNode }) => 
         updateUpload(id, { status: 'error', error: err instanceof Error ? err.message : 'Upload failed' });
       }
     })();
+    return id;
   }, [updateUpload]);
 
   const getUploadsForMovie = useCallback(

@@ -29,6 +29,7 @@ const MovieForm = ({
   onCancel,
   onSubmit,
   showToast,
+  videoUploads,
 }: MovieFormProps) => {
   const form = useMovieForm({ initialValues, initialPreviews, initialSeasons, showToast, onSubmit });
   const { t } = useLanguage();
@@ -166,6 +167,7 @@ const MovieForm = ({
               iconColorClass="text-[#3b82f6]"
               file={form.files.trailer}
               preview={form.previews.trailer}
+              upload={videoUploads?.trailer}
               inputRef={form.refs.trailerInputRef}
               onChange={(e) => form.handleVideoChange('trailer', e)}
               onRemove={() => form.removeVideo('trailer')}
@@ -180,6 +182,7 @@ const MovieForm = ({
                 maxPreviewHeight="400px"
                 file={form.files.video}
                 preview={form.previews.video}
+                upload={videoUploads?.video}
                 inputRef={form.refs.videoInputRef}
                 onChange={(e) => form.handleVideoChange('video', e)}
                 onRemove={() => form.removeVideo('video')}
@@ -200,6 +203,12 @@ const MovieForm = ({
                 onToggleEpisodeFree={form.toggleEpisodeFree}
                 onUnlockAllEpisodes={form.unlockSeasonEpisodes}
                 onLockAllEpisodes={form.lockSeasonEpisodes}
+                reorderingSeasonId={form.reorderingSeasonId}
+                isSavingEpisodeOrder={form.isSavingEpisodeOrder}
+                onStartReorder={form.startReorder}
+                onCancelReorder={form.cancelReorder}
+                onSwapEpisodes={form.swapEpisodes}
+                onSaveEpisodeOrder={form.saveEpisodeOrder}
               />
             )}
           </div>
