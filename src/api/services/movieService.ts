@@ -195,6 +195,29 @@ export interface UploadStatus {
   ref_id?: number;
 }
 
+export interface UploadFileInChunksOptions {
+  /** Upload progress 0-100, based on bytes sent across all parts. */
+  onProgress?: (percent: number) => void;
+  onSessionReady?: (session: UploadSession) => void;
+  onPartComplete?: (part: CompleteUploadPart) => void;
+  resume?: { session: UploadSession; completedParts: CompleteUploadPart[] };
+}
+
+// PUTs one chunk to its presigned URL via XHR rather than fetch, since fetch has no
+// upload-progress events and per-part granularity is too coarse for large chunks.
+const putChunk = (url: string, chunk: Blob, onBytes: (loaded: number) => void) =>
+  new Promise<string | null>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.upload.onprogress = (e) => onBytes(e.loaded);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.getResponseHeader('ETag'));
+      else reject(new Error(`HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(chunk);
+  });
+
 export interface LockEpisodesData {
   isLocked: boolean;
   /** Locks/unlocks every episode within this season */
@@ -205,6 +228,12 @@ export interface LockEpisodesData {
 
 export interface LockEpisodesResponse {
   message: string;
+}
+
+export interface ReorderEpisodesResponse {
+  message: string;
+  /** The episode_number each episode was given, in the new order. */
+  episodes: { global_id: string; episode_number: number }[];
 }
 
 export const movieService = {
@@ -282,10 +311,18 @@ export const movieService = {
     });
   },
 
+  /** episodeIds must list every episode of the season, in the new order. */
+  reorderEpisodes: (seasonGlobalId: string, episodeIds: string[]) => {
+    return apiClient<ReorderEpisodesResponse>(`/v1/movies/seasons/${seasonGlobalId}/episodes/order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ episode_ids: episodeIds }),
+    });
+  },
+
   // Chunks `file` per the init session, PUTs each part to storage, completes the
   // upload, and returns the upload_global_id for use as upload_id/trailer_upload_id.
-  // onProgress reports 0-100 based on parts completed (uploading phase only —
-  // it does not track server-side conversion, which happens after completeUpload).
+  // onProgress reports 0-100 based on bytes sent (uploading phase only — it does
+  // not track server-side conversion, which happens after completeUpload).
   //
   // `resume` lets a caller continue an interrupted upload (e.g. after a page reload)
   // instead of re-initializing: pass back the original `session` (still holding the
@@ -308,27 +345,36 @@ export const movieService = {
 
     const parts: CompleteUploadPart[] = [...(resume?.completedParts ?? [])];
     const alreadyDone = new Set(parts.map((p) => p.part_number));
-    onProgress?.(Math.round((parts.length / session.total_parts) * 100));
+    const partSize = (partNumber: number) =>
+      Math.max(0, Math.min(session.chunk_size, file.size - (partNumber - 1) * session.chunk_size));
+    let bytesDone = parts.reduce((sum, p) => sum + partSize(p.part_number), 0);
+    // Capped at 99 until completeUpload succeeds, so 100% means the server has the whole file.
+    const reportProgress = (inFlight: number) =>
+      onProgress?.(file.size > 0 ? Math.min(99, Math.floor(((bytesDone + inFlight) / file.size) * 100)) : 0);
+    reportProgress(0);
 
     for (const part of session.parts) {
       if (alreadyDone.has(part.part_number)) continue;
       const start = (part.part_number - 1) * session.chunk_size;
       const chunk = file.slice(start, start + session.chunk_size);
-      const res = await fetch(part.url, { method: 'PUT', body: chunk });
-      if (!res.ok) {
-        throw new Error(`Failed to upload part ${part.part_number} of ${session.total_parts}`);
+      let etag: string | null;
+      try {
+        etag = await putChunk(part.url, chunk, reportProgress);
+      } catch (err) {
+        throw new Error(`Failed to upload part ${part.part_number} of ${session.total_parts}: ${(err as Error).message}`);
       }
-      const etag = res.headers.get('ETag') ?? res.headers.get('etag');
       if (!etag) {
         throw new Error(`Storage did not return an ETag for part ${part.part_number} (check CORS Access-Control-Expose-Headers)`);
       }
       const completedPart = { part_number: part.part_number, etag };
       parts.push(completedPart);
       onPartComplete?.(completedPart);
-      onProgress?.(Math.round((parts.length / session.total_parts) * 100));
+      bytesDone += chunk.size;
+      reportProgress(0);
     }
 
     await movieService.completeUpload(session.upload_global_id, parts);
+    onProgress?.(100);
     return session.upload_global_id;
   },
 

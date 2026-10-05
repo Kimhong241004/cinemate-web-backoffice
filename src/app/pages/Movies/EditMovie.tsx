@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useNotification } from '../../context/NotificationContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { useUploadManager } from '../../context/UploadManagerContext';
+import { useTrackedVideoUploads, holdUploadComplete } from '../../hooks/useTrackedVideoUploads';
 import MovieForm, { MovieFormValues, MovieFormFiles } from '../../components/moviesform/MovieForm';
 import { movieService, MovieFromApi, CreateMovieData } from '../../../api/services/movieService';
 import { Episode, Season, SliderImage } from '../../../types/movie';
@@ -72,13 +72,19 @@ const EditMovie = () => {
   const { id } = useParams<{ id: string }>();
   const { showToast } = useNotification();
   const { t } = useLanguage();
-  const { startBackgroundUpload } = useUploadManager();
   const fromPage = searchParams.get('page');
   const backToMovies = fromPage ? `/movies?page=${fromPage}` : '/movies';
 
   const [movie, setMovie] = useState<MovieFromApi | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The admin stays on the form while a replacement trailer/video uploads so they can
+  // watch the progress, then goes back to the Movies list once the files are attached.
+  const { videoUploads, isUploadingVideos, startVideoUploads } = useTrackedVideoUploads((failed) => {
+    if (failed.length > 0) showToast(failed[0].error ?? t.movies.form.failedUpdateMovie, 'error');
+    else showToast(t.movies.form.movieUpdatedSuccess, 'success');
+    navigate(backToMovies);
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -121,9 +127,9 @@ const EditMovie = () => {
                 if (!episode.videoFile) {
                   return { episode_number: episode.episodeNumber, title: episode.title, release_date: episode.releaseDate || undefined, is_free: isFree, upload_id: undefined };
                 }
-                const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile, (pct) =>
-                  updateEpisodeField(season.id, episode.id, 'uploadProgress', pct)
-                );
+                const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile, {
+                  onProgress: (pct) => updateEpisodeField(season.id, episode.id, 'uploadProgress', pct),
+                });
                 pollConvertStatus(uploadGlobalId, (convertStatus) =>
                   updateEpisodeField(season.id, episode.id, 'convertStatus', convertStatus)
                 );
@@ -177,16 +183,12 @@ const EditMovie = () => {
         }
       }
 
-      if (files.trailer) startBackgroundUpload(id, 'trailer', files.trailer);
-      if (files.video) startBackgroundUpload(id, 'movie', files.video);
-
-      showToast(
-        files.trailer || files.video
-          ? t.movies.form.movieUpdatedBgUpload
-          : t.movies.form.movieUpdatedSuccess,
-        'success'
-      );
-      navigate(backToMovies);
+      if (!startVideoUploads(id, files)) {
+        // Let the finished episode bars show 100% before leaving the page.
+        if (values.uploadType === 'series' && seasons.some((s) => s.episodes.some((e) => e.videoFile))) await holdUploadComplete();
+        showToast(t.movies.form.movieUpdatedSuccess, 'success');
+        navigate(backToMovies);
+      }
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : t.movies.form.failedUpdateMovie, 'error');
     } finally {
@@ -211,7 +213,8 @@ const EditMovie = () => {
       subtitle={t.movies.form.editSubtitle}
       submitLabel={t.movies.form.updateBtn}
       submittingLabel={t.movies.form.updatingBtn}
-      isSubmitting={isSubmitting}
+      isSubmitting={isSubmitting || isUploadingVideos}
+      videoUploads={videoUploads}
       initialValues={movie ? toFormValues(movie) : undefined}
       initialPreviews={{
         poster: movie?.poster_url ?? '',

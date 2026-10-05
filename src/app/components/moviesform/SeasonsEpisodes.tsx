@@ -1,6 +1,7 @@
-import { Plus, Play, Upload, X, Unlock, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Play, Upload, X, Unlock, Lock, ArrowUpDown, Check, GripVertical } from 'lucide-react';
 import { Episode, Season } from '../../../types/movie';
-import { getVideoStatusDisplay } from '../../utils/videoStatus';
+import ConvertStatusBadge from './ConvertStatusBadge';
 import { useLanguage } from '../../context/LanguageContext';
 
 interface SeasonsEpisodesProps {
@@ -16,14 +17,25 @@ interface SeasonsEpisodesProps {
   onToggleEpisodeFree: (seasonId: number, episodeId: number, isFree: boolean) => void;
   onUnlockAllEpisodes: (seasonId: number) => void;
   onLockAllEpisodes: (seasonId: number) => void;
+  /** The season whose episodes are currently being dragged into a new order, if any. */
+  reorderingSeasonId: number | null;
+  isSavingEpisodeOrder: boolean;
+  onStartReorder: (seasonId: number) => void;
+  onCancelReorder: () => void;
+  onSwapEpisodes: (seasonId: number, fromIndex: number, toIndex: number) => void;
+  onSaveEpisodeOrder: (seasonId: number) => void;
 }
 
 const SeasonsEpisodes = ({
   seasons, isSubmitting, onAddSeason, onRemoveSeason, onAddEpisode, onRemoveEpisode,
   onEpisodeThumbnailChange, onEpisodeVideoChange, onUpdateEpisodeField, onToggleEpisodeFree,
   onUnlockAllEpisodes, onLockAllEpisodes,
+  reorderingSeasonId, isSavingEpisodeOrder, onStartReorder, onCancelReorder, onSwapEpisodes, onSaveEpisodeOrder,
 }: SeasonsEpisodesProps) => {
   const { t } = useLanguage();
+  // The card being dragged and the card it's hovering over; the two swap on drop.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   return (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
@@ -60,7 +72,38 @@ const SeasonsEpisodes = ({
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                {season.globalId && season.episodes.length > 0 && (() => {
+                {reorderingSeasonId === season.id ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onCancelReorder}
+                      disabled={isSavingEpisodeOrder}
+                      className="px-3 py-1.5 rounded-lg bg-[#27272a] text-white text-xs font-medium hover:bg-[#3f3f46] transition-colors disabled:opacity-50"
+                    >
+                      {t.common.cancel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSaveEpisodeOrder(season.id)}
+                      disabled={isSavingEpisodeOrder}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#22c55e] text-white text-xs font-medium hover:bg-[#16a34a] transition-colors disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      {isSavingEpisodeOrder ? t.movies.form.savingEpisodeOrder : t.movies.form.saveEpisodeOrder}
+                    </button>
+                  </>
+                ) : season.episodes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onStartReorder(season.id)}
+                    disabled={isSubmitting || reorderingSeasonId !== null}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#27272a] text-white text-xs font-medium hover:bg-[#3f3f46] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                    {t.movies.form.reorderEpisodes}
+                  </button>
+                )}
+                {reorderingSeasonId !== season.id && season.globalId && season.episodes.length > 0 && (() => {
                   const allUnlocked = season.episodes.every(ep => !ep.isLocked);
                   const allLocked = season.episodes.every(ep => ep.isLocked);
                   return (
@@ -91,7 +134,8 @@ const SeasonsEpisodes = ({
                 <button
                   type="button"
                   onClick={() => onRemoveSeason(season.id)}
-                  className="p-1.5 rounded-lg bg-[#27272a] text-[#71717a] hover:bg-[#ef4444] hover:text-white transition-colors"
+                  disabled={reorderingSeasonId === season.id}
+                  className="p-1.5 rounded-lg bg-[#27272a] text-[#71717a] hover:bg-[#ef4444] hover:text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -101,6 +145,54 @@ const SeasonsEpisodes = ({
             {season.episodes.length === 0 ? (
               <div className="border border-[#27272a] rounded-lg p-6 text-center">
                 <p className="text-[#71717a] text-sm">{t.movies.form.noEpisodesYet}</p>
+              </div>
+            ) : reorderingSeasonId === season.id ? (
+              <div className="space-y-2">
+                <p className="text-[#71717a] text-xs">{t.movies.form.reorderEpisodesHint}</p>
+                {season.episodes.map((episode, index) => (
+                  <div
+                    key={episode.id}
+                    draggable={!isSavingEpisodeOrder}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDragIndex(index);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (overIndex !== index) setOverIndex(index);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragIndex !== null) onSwapEpisodes(season.id, dragIndex, index);
+                    }}
+                    onDragEnd={() => {
+                      setDragIndex(null);
+                      setOverIndex(null);
+                    }}
+                    className={`flex items-center gap-3 border rounded-lg px-3 py-2 bg-[#18181b] cursor-grab active:cursor-grabbing select-none transition-colors ${
+                      dragIndex === index
+                        ? 'border-[#FF2E63] opacity-60'
+                        : dragIndex !== null && overIndex === index
+                          ? 'border-[#FF2E63] border-dashed bg-[#27272a]'
+                          : 'border-[#27272a] hover:border-[#3f3f46]'
+                    }`}
+                  >
+                    <GripVertical className="w-4 h-4 text-[#71717a] flex-shrink-0" />
+                    <div className="flex-shrink-0 text-white font-medium w-8">{index + 1}</div>
+                    <div className="flex-shrink-0 w-10 h-10 bg-[#27272a] rounded-md overflow-hidden flex items-center justify-center">
+                      {episode.thumbnailPreview ? (
+                        <img src={episode.thumbnailPreview} alt="" className="w-full h-full object-cover" draggable={false} />
+                      ) : (
+                        <Play className="w-4 h-4 text-[#71717a]" />
+                      )}
+                    </div>
+                    <p className="flex-1 text-white text-sm truncate">{episode.title || '—'}</p>
+                    {/* Shows what moved before saving: the number it has now → its new position. */}
+                    {episode.episodeNumber !== index + 1 && (
+                      <span className="flex-shrink-0 text-[#FF2E63] text-xs">#{episode.episodeNumber} → #{index + 1}</span>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="space-y-3">
@@ -158,27 +250,6 @@ const SeasonsEpisodes = ({
                           {episode.videoFile && (
                             <p className="text-[#22c55e] text-xs mt-1 truncate">{episode.videoFile.name}</p>
                           )}
-                          {isSubmitting && episode.videoFile && episode.uploadProgress > 0 && episode.uploadProgress < 100 && (
-                            <div className="mt-1.5">
-                              <div className="h-1.5 w-full bg-[#27272a] rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] transition-all"
-                                  style={{ width: `${episode.uploadProgress}%` }}
-                                />
-                              </div>
-                              <p className="text-[#71717a] text-[10px] mt-0.5">{t.movies.form.uploading} {episode.uploadProgress}%</p>
-                            </div>
-                          )}
-                          {episode.convertStatus && (() => {
-                            const display = getVideoStatusDisplay(episode.convertStatus);
-                            if (!display || display.label === 'Completed') return null;
-                            return (
-                              <span className={`inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium ${display.badgeCls}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${display.dot} ${display.terminal ? '' : 'animate-pulse'}`} />
-                                {display.label}
-                              </span>
-                            );
-                          })()}
                         </div>
 
                         <div>
@@ -223,6 +294,32 @@ const SeasonsEpisodes = ({
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* Full-width under the card's fields: the upload bar while bytes are
+                        being sent, then the convert (transcoding) status in its place. */}
+                    {(() => {
+                      const isUploading = isSubmitting && episode.videoFile && episode.uploadProgress < 100;
+                      if (isUploading) {
+                        return (
+                          <div className="mt-4">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-medium text-[#a1a1aa]">{t.movies.form.uploading}</span>
+                              <span className="text-sm font-semibold text-white">{episode.uploadProgress}%</span>
+                            </div>
+                            <div className="h-3 w-full bg-[#27272a] rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63]"
+                                style={{ width: `${episode.uploadProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+                      // Right after the upload finishes there's a gap before the first convert
+                      // status poll returns, so show Pending instead of an empty card.
+                      const justUploaded = isSubmitting && episode.videoFile && episode.uploadProgress >= 100;
+                      return <ConvertStatusBadge status={episode.convertStatus ?? (justUploaded ? 'pending' : undefined)} />;
+                    })()}
 
                     {episode.videoPreview && (
                       <div className="mt-3 border border-[#27272a] rounded-lg overflow-hidden">
