@@ -53,7 +53,7 @@ const Login = () => {
             <span className="text-white text-3xl font-bold">C</span>
           </div>
           <h1 className="text-[30px] font-extrabold leading-[36px] tracking-[4px] uppercase bg-gradient-to-r from-[#6C5CE7] to-[#FF2E63] bg-clip-text text-transparent mb-1">
-            CINEMATE - testing
+            CINEMATE
           </h1>
           <p className="text-gray-400 text-sm font-bold">
             {t.login.adminPortal}
