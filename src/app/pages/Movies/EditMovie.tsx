@@ -7,6 +7,12 @@ import MovieForm, { MovieFormValues, MovieFormFiles } from '../../components/mov
 import { movieService, MovieFromApi, CreateMovieData } from '../../../api/services/movieService';
 import { Episode, Season, SliderImage } from '../../../types/movie';
 import { pollConvertStatus } from '../../utils/pollConvertStatus';
+import { runWithConcurrency } from '../../utils/concurrency';
+
+// Caps how many episode videos chunked-upload in parallel. A bulk-selected batch can be
+// large (dozens of files); an unbounded Promise.all would fire all of them at once and
+// blow past the browser's per-host connection limit / overwhelm the upload backend.
+const EPISODE_UPLOAD_CONCURRENCY = 3;
 
 const qualityFromApi: Record<string, string> = {
   full_hd: 'FHD',
@@ -114,36 +120,36 @@ const EditMovie = () => {
       // fine to just kick off a watcher for the progress UI without blocking submission.
       let seasonsPayload: CreateMovieData['seasons'];
       if (values.uploadType === 'series' && seasons.length > 0) {
-        seasonsPayload = await Promise.all(
-          seasons.map(async (season) => ({
-            season_number: season.seasonNumber,
-            episodes: await Promise.all(
-              season.episodes.map(async (episode) => {
-                // Free/locked status for an existing episode is set via the dedicated lock
-                // endpoint the moment the checkbox is toggled (see toggleEpisodeFree), not
-                // resent here — is_free only matters for episodes being created for the
-                // first time, since there's nothing else to set their initial lock state.
-                const isFree = episode.globalId ? undefined : episode.isFree;
-                if (!episode.videoFile) {
-                  return { episode_number: episode.episodeNumber, title: episode.title, release_date: episode.releaseDate || undefined, is_free: isFree, upload_id: undefined };
-                }
-                const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile, {
-                  onProgress: (pct) => updateEpisodeField(season.id, episode.id, 'uploadProgress', pct),
-                });
-                pollConvertStatus(uploadGlobalId, (convertStatus) =>
-                  updateEpisodeField(season.id, episode.id, 'convertStatus', convertStatus)
-                );
-                return {
-                  episode_number: episode.episodeNumber,
-                  title: episode.title,
-                  release_date: episode.releaseDate || undefined,
-                  is_free: isFree,
-                  upload_id: uploadGlobalId,
-                };
-              })
-            ),
-          }))
+        const uploadTasks = seasons.flatMap((season) =>
+          season.episodes
+            .filter((episode) => episode.videoFile)
+            .map((episode) => ({ season, episode }))
         );
+        const uploadIdsByEpisode = new Map<number, string>();
+        await runWithConcurrency(uploadTasks, EPISODE_UPLOAD_CONCURRENCY, async ({ season, episode }) => {
+          const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile!, {
+            onProgress: (pct) => updateEpisodeField(season.id, episode.id, 'uploadProgress', pct),
+          });
+          uploadIdsByEpisode.set(episode.id, uploadGlobalId);
+          pollConvertStatus(uploadGlobalId, (convertStatus) =>
+            updateEpisodeField(season.id, episode.id, 'convertStatus', convertStatus)
+          );
+        });
+
+        seasonsPayload = seasons.map((season) => ({
+          season_number: season.seasonNumber,
+          episodes: season.episodes.map((episode) => ({
+            episode_number: episode.episodeNumber,
+            title: episode.title,
+            release_date: episode.releaseDate || undefined,
+            // Free/locked status for an existing episode is set via the dedicated lock
+            // endpoint the moment the checkbox is toggled (see toggleEpisodeFree), not
+            // resent here — is_free only matters for episodes being created for the
+            // first time, since there's nothing else to set their initial lock state.
+            is_free: episode.globalId ? undefined : episode.isFree,
+            upload_id: uploadIdsByEpisode.get(episode.id),
+          })),
+        }));
       }
 
       // Update the movie's fields right away without waiting for a replacement

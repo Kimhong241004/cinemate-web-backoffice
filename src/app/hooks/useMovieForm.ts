@@ -274,6 +274,48 @@ export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, s
     }
   };
 
+  // Adds one new episode per selected video to the end of the season, ordered by
+  // filename with numeric awareness (so "ep2" comes before "ep10").
+  const handleBulkEpisodeVideoChange = (seasonId: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const allFiles = Array.from(fileList);
+    const videoFiles = allFiles.filter(file => file.type.startsWith('video/'));
+    const skippedCount = allFiles.length - videoFiles.length;
+    if (skippedCount > 0) {
+      showToast(`${skippedCount} ${t.movies.form.nonVideoFilesSkipped}`, 'error');
+    }
+    if (videoFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    videoFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+    setSeasons(prev => prev.map(season => {
+      if (season.id !== seasonId) return season;
+      const startNumber = season.episodes.length + 1;
+      const newEpisodes: Episode[] = videoFiles.map((file, i) => ({
+        id: Date.now() + i,
+        episodeNumber: startNumber + i,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        isFree: false,
+        thumbnail: null,
+        thumbnailPreview: '',
+        platform: '',
+        releaseDate: '',
+        videoFile: file,
+        videoPreview: URL.createObjectURL(file),
+        uploadProgress: 0,
+      }));
+      return { ...season, episodes: [...season.episodes, ...newEpisodes] };
+    }));
+
+    showToast(`${videoFiles.length} ${t.movies.form.episodesAddedFromFiles}`, 'success');
+    e.target.value = '';
+  };
+
   // Uses the functional setState form (not `seasons.map(...)` off the closed-over variable)
   // because this gets called multiple times in a row across an await — e.g. toggleEpisodeFree's
   // isFree update followed later by its isLocked confirmation, or the many onProgress ticks
@@ -496,6 +538,7 @@ export const useMovieForm = ({ initialValues, initialPreviews, initialSeasons, s
     removeEpisode,
     handleEpisodeThumbnailChange,
     handleEpisodeVideoChange,
+    handleBulkEpisodeVideoChange,
     updateEpisodeField,
     toggleEpisodeFree,
     unlockSeasonEpisodes,
