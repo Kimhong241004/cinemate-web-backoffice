@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Play, Upload, X, Unlock, Lock, ArrowUpDown, Check, GripVertical } from 'lucide-react';
+import { Plus, Play, Upload, Files, X, Unlock, Lock, ArrowUpDown, Check, GripVertical } from 'lucide-react';
 import { Episode, Season } from '../../../types/movie';
 import ConvertStatusBadge from './ConvertStatusBadge';
 import { useLanguage } from '../../context/LanguageContext';
@@ -13,6 +13,7 @@ interface SeasonsEpisodesProps {
   onRemoveEpisode: (seasonId: number, episodeId: number) => void;
   onEpisodeThumbnailChange: (seasonId: number, episodeId: number, e: React.ChangeEvent<HTMLInputElement>) => void;
   onEpisodeVideoChange: (seasonId: number, episodeId: number, e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBulkEpisodeVideoChange: (seasonId: number, e: React.ChangeEvent<HTMLInputElement>) => void;
   onUpdateEpisodeField: (seasonId: number, episodeId: number, field: keyof Episode, value: any) => void;
   onToggleEpisodeFree: (seasonId: number, episodeId: number, isFree: boolean) => void;
   onUnlockAllEpisodes: (seasonId: number) => void;
@@ -28,7 +29,7 @@ interface SeasonsEpisodesProps {
 
 const SeasonsEpisodes = ({
   seasons, isSubmitting, onAddSeason, onRemoveSeason, onAddEpisode, onRemoveEpisode,
-  onEpisodeThumbnailChange, onEpisodeVideoChange, onUpdateEpisodeField, onToggleEpisodeFree,
+  onEpisodeThumbnailChange, onEpisodeVideoChange, onBulkEpisodeVideoChange, onUpdateEpisodeField, onToggleEpisodeFree,
   onUnlockAllEpisodes, onLockAllEpisodes,
   reorderingSeasonId, isSavingEpisodeOrder, onStartReorder, onCancelReorder, onSwapEpisodes, onSaveEpisodeOrder,
 }: SeasonsEpisodesProps) => {
@@ -70,6 +71,24 @@ const SeasonsEpisodes = ({
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  type="button"
+                  title={t.movies.form.bulkUploadEpisodesHint}
+                  onClick={() => document.getElementById(`bulk-episode-video-${season.id}`)?.click()}
+                  disabled={isSubmitting || reorderingSeasonId === season.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#27272a] rounded-lg text-white text-xs font-medium hover:bg-[#3f3f46] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Files className="w-3.5 h-3.5" />
+                  {t.movies.form.bulkUploadEpisodes}
+                </button>
+                <input
+                  id={`bulk-episode-video-${season.id}`}
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  onChange={(e) => onBulkEpisodeVideoChange(season.id, e)}
+                  className="hidden"
+                />
               </div>
               <div className="flex items-center gap-2">
                 {reorderingSeasonId === season.id ? (

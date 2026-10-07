@@ -199,6 +199,7 @@ const MovieForm = ({
                 onRemoveEpisode={form.removeEpisode}
                 onEpisodeThumbnailChange={form.handleEpisodeThumbnailChange}
                 onEpisodeVideoChange={form.handleEpisodeVideoChange}
+                onBulkEpisodeVideoChange={form.handleBulkEpisodeVideoChange}
                 onUpdateEpisodeField={form.updateEpisodeField}
                 onToggleEpisodeFree={form.toggleEpisodeFree}
                 onUnlockAllEpisodes={form.unlockSeasonEpisodes}

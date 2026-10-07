@@ -7,12 +7,18 @@ import MovieForm, { MovieFormValues, MovieFormFiles } from '../../components/mov
 import { movieService, CreateMovieData } from '../../../api/services/movieService';
 import { Episode, Season, SliderImage } from '../../../types/movie';
 import { pollConvertStatus } from '../../utils/pollConvertStatus';
+import { runWithConcurrency } from '../../utils/concurrency';
 
 const qualityToApi: Record<string, string> = {
   FHD: 'full_hd',
   HD: 'hd',
   SD: 'hd',
 };
+
+// Caps how many episode videos chunked-upload in parallel. A bulk-selected batch can be
+// large (dozens of files); an unbounded Promise.all would fire all of them at once and
+// blow past the browser's per-host connection limit / overwhelm the upload backend.
+const EPISODE_UPLOAD_CONCURRENCY = 3;
 
 const AddMovie = () => {
   const navigate = useNavigate();
@@ -43,31 +49,32 @@ const AddMovie = () => {
       // watcher for the progress UI without blocking the rest of submission on it.
       let seasonsPayload: CreateMovieData['seasons'];
       if (values.uploadType === 'series' && seasons.length > 0) {
-        seasonsPayload = await Promise.all(
-          seasons.map(async (season) => ({
-            season_number: season.seasonNumber,
-            episodes: await Promise.all(
-              season.episodes.map(async (episode) => {
-                if (!episode.videoFile) {
-                  return { episode_number: episode.episodeNumber, title: episode.title, release_date: episode.releaseDate || undefined, is_free: episode.isFree, upload_id: undefined };
-                }
-                const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile, {
-                  onProgress: (pct) => updateEpisodeField(season.id, episode.id, 'uploadProgress', pct),
-                });
-                pollConvertStatus(uploadGlobalId, (convertStatus) =>
-                  updateEpisodeField(season.id, episode.id, 'convertStatus', convertStatus)
-                );
-                return {
-                  episode_number: episode.episodeNumber,
-                  title: episode.title,
-                  release_date: episode.releaseDate || undefined,
-                  is_free: episode.isFree,
-                  upload_id: uploadGlobalId,
-                };
-              })
-            ),
-          }))
+        const uploadTasks = seasons.flatMap((season) =>
+          season.episodes
+            .filter((episode) => episode.videoFile)
+            .map((episode) => ({ season, episode }))
         );
+        const uploadIdsByEpisode = new Map<number, string>();
+        await runWithConcurrency(uploadTasks, EPISODE_UPLOAD_CONCURRENCY, async ({ season, episode }) => {
+          const uploadGlobalId = await movieService.uploadFileInChunks('movie', episode.videoFile!, {
+            onProgress: (pct) => updateEpisodeField(season.id, episode.id, 'uploadProgress', pct),
+          });
+          uploadIdsByEpisode.set(episode.id, uploadGlobalId);
+          pollConvertStatus(uploadGlobalId, (convertStatus) =>
+            updateEpisodeField(season.id, episode.id, 'convertStatus', convertStatus)
+          );
+        });
+
+        seasonsPayload = seasons.map((season) => ({
+          season_number: season.seasonNumber,
+          episodes: season.episodes.map((episode) => ({
+            episode_number: episode.episodeNumber,
+            title: episode.title,
+            release_date: episode.releaseDate || undefined,
+            is_free: episode.isFree,
+            upload_id: uploadIdsByEpisode.get(episode.id),
+          })),
+        }));
       }
 
       // Create the movie right away without waiting for the trailer/video to finish
